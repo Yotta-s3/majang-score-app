@@ -280,8 +280,8 @@ input {
 }
 
 .compact-input {
-  padding: 10px 8px;
-  font-size: 1.05rem;
+  padding: 8px 6px;
+  font-size: 1rem;
   text-align: right;
   width: 100%;
 }
