@@ -223,16 +223,17 @@ input {
 .hand-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.95rem;
+  font-size: 1rem;
 }
 
 .hand-table th,
 .hand-table td {
   border: 1px solid rgba(47, 84, 62, 0.16);
-  padding: 8px;
+  padding: 8px 6px;
   text-align: center;
   vertical-align: top;
   background: #fff;
+  min-width: 110px;
 }
 
 .hand-table thead th {
@@ -243,6 +244,7 @@ input {
 .hand-table .col-head,
 .hand-table .col-actions {
   width: 72px;
+  min-width: 72px;
 }
 
 .summary-row th {
@@ -275,7 +277,9 @@ input {
 }
 
 .compact-input {
-  padding: 6px 8px;
+  padding: 10px 8px;
+  font-size: 1.05rem;
+  text-align: right;
 }
 
 .list {
