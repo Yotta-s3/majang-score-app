@@ -13,7 +13,8 @@ export default defineConfig({
       manifest: {
         name: 'Mahjong Score',
         short_name: 'MahjongScore',
-        start_url: '/',
+        start_url: '/majang-score-app/',
+        scope: '/majang-score-app/',
         display: 'standalone',
         background_color: '#f4f2e9',
         theme_color: '#0f5132',
