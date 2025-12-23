@@ -152,7 +152,7 @@ const computeFinalRanks = (totals: number[], tieRule: TieRuleId) => {
 }
 
 const computeFeeShares = (totals: number[], tieRule: TieRuleId, feeAmount: number) => {
-  const sharesByPosition = [0, 2 / 6, 1 / 6, 3 / 6]
+  const sharesByPosition = [0, 1 / 6, 2 / 6, 3 / 6]
   const items = totals.map((score, index) => ({ score, index }))
   items.sort((a, b) => {
     if (b.score !== a.score) return b.score - a.score
@@ -241,7 +241,7 @@ function App() {
   }, [parsedScores])
   const scoreReady = parsedScores.every((value) => value !== null)
   const scoreOk = scoreReady && scoreTotal === 100000
-  const handCanSave = scoreReady
+  const handCanSave = scoreOk
 
   const roomFeeValue = parsePositiveInt(roomFeeAmount)
   const roomFeeValid = !roomFeeEnabled || roomFeeValue !== null
@@ -534,11 +534,8 @@ function App() {
                     </td>
                   ))}
                   <td className="row-actions">
-                    <button onClick={saveHand} disabled={!handCanSave}>
-                      保存
-                    </button>
-                    <button className="ghost" onClick={resetHandForm}>
-                      クリア
+                    <button onClick={saveHand} disabled={!handCanSave} aria-label="保存">
+                      💾
                     </button>
                   </td>
                 </tr>
@@ -564,9 +561,15 @@ function App() {
                         </td>
                       ))}
                       <td className="row-actions">
-                        <button onClick={() => editHand(hand)}>編集</button>
-                        <button className="ghost" onClick={() => deleteHand(hand.id)}>
-                          削除
+                        <button onClick={() => editHand(hand)} aria-label="編集">
+                          ✎
+                        </button>
+                        <button
+                          className="danger"
+                          onClick={() => deleteHand(hand.id)}
+                          aria-label="削除"
+                        >
+                          ×
                         </button>
                         {handTotal !== 100000 && (
                           <div className="small warn">合計NG</div>

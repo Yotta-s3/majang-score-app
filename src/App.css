@@ -335,6 +335,11 @@ input {
   color: #3a3a3a;
 }
 
+.row-actions .danger {
+  background: #c0392b;
+  color: #fff;
+}
+
 .final-grid {
   display: grid;
   gap: 8px;
@@ -365,8 +370,4 @@ input {
     align-items: flex-start;
   }
 
-  .row-actions {
-    grid-auto-flow: column;
-    justify-content: start;
-  }
 }
