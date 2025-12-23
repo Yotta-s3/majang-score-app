@@ -229,22 +229,22 @@ input {
 .hand-table th,
 .hand-table td {
   border: 1px solid rgba(47, 84, 62, 0.16);
-  padding: 8px 6px;
+  padding: 4px 2px;
   text-align: center;
   vertical-align: top;
   background: #fff;
-  min-width: 96px;
+  min-width: 10px;
 }
 
 .hand-table thead th {
   background: #f1f5ed;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .hand-table .col-head,
 .hand-table .col-actions {
-  width: 56px;
-  min-width: 56px;
+  width: 22px;
+  min-width: 22px;
 }
 
 .summary-row th {
@@ -263,6 +263,9 @@ input {
 .row-label {
   font-weight: 600;
   color: #1f3a2d;
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+  letter-spacing: 0.1em;
 }
 
 .row-actions {

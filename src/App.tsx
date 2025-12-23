@@ -467,7 +467,7 @@ function App() {
       {selectedRoom && (
         <section className="card compact">
           <div className="card-title compact-title">
-            <h2>半荘テーブル</h2>
+            <h2>点数記録</h2>
             <div className="compact-meta">
               <span className={scoreOk ? 'badge ok' : 'badge warn'}>
                 合計: {scoreReady ? scoreTotal : '未入力'}
@@ -489,7 +489,7 @@ function App() {
                   <th className="col-actions">操作</th>
                 </tr>
                 <tr className="summary-row">
-                  <th>合計</th>
+                  <th className="row-label">合計</th>
                   {selectedRoom.players.map((player, index) => (
                     <th key={player}>
                       <div className="summary-cell">
@@ -502,7 +502,7 @@ function App() {
                 </tr>
                 {feeEnabled && feeShares && (
                   <tr className="summary-row">
-                    <th>場代</th>
+                    <th className="row-label">場代</th>
                     {selectedRoom.players.map((player, index) => (
                       <th key={player}>{formatAmount(feeShares[index])}</th>
                     ))}
@@ -556,7 +556,7 @@ function App() {
                   const handTotal = sumScores(hand.scores)
                   return (
                     <tr key={hand.id}>
-                      <td className="row-label">#{index + 1}</td>
+                      <td className="row-label">{index + 1}</td>
                       {selectedRoom.players.map((player, i) => (
                         <td key={player}>
                           <div>{hand.scores[i]}</div>
