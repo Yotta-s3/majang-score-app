@@ -233,7 +233,7 @@ input {
   text-align: center;
   vertical-align: top;
   background: #fff;
-  min-width: 110px;
+  min-width: 96px;
 }
 
 .hand-table thead th {
@@ -243,8 +243,8 @@ input {
 
 .hand-table .col-head,
 .hand-table .col-actions {
-  width: 72px;
-  min-width: 72px;
+  width: 56px;
+  min-width: 56px;
 }
 
 .summary-row th {
@@ -280,6 +280,7 @@ input {
   padding: 10px 8px;
   font-size: 1.05rem;
   text-align: right;
+  width: 100%;
 }
 
 .list {
