@@ -171,6 +171,13 @@ input {
   gap: 10px;
 }
 
+.room-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: stretch;
+}
+
 .room-button {
   text-align: left;
   padding: 10px 12px;
@@ -338,6 +345,13 @@ input {
 .row-actions .danger {
   background: #c0392b;
   color: #fff;
+}
+
+.room-delete {
+  width: 36px;
+  border-radius: 10px;
+  border: none;
+  font-weight: 700;
 }
 
 .final-grid {

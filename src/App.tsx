@@ -341,6 +341,14 @@ function App() {
     }
   }
 
+  const deleteRoom = async (id: string) => {
+    await db.hands.where('roomId').equals(id).delete()
+    await db.rooms.delete(id)
+    if (selectedRoomId === id) {
+      setSelectedRoomId(null)
+    }
+  }
+
   return (
     <div className="page">
       <header className="header">
@@ -448,18 +456,22 @@ function App() {
         {!rooms.length && <p className="muted">まだルームがありません。</p>}
         <div className="room-list">
           {rooms.map((room) => (
-            <button
-              key={room.id}
-              className={room.id === selectedRoomId ? 'room-button active' : 'room-button'}
-              onClick={() => setSelectedRoomId(room.id)}
-            >
-              <div>{room.date}</div>
-              <div className="small">{room.players.join(' / ')}</div>
-              <div className="small">
-                {getUmaRule(room.umaRule).label} / {getOkaRule(room.okaRule).label}
-              </div>
-              <div className="small">{room.feeEnabled ? `場代: ${room.feeAmount}` : '場代なし'}</div>
-            </button>
+            <div key={room.id} className="room-item">
+              <button
+                className={room.id === selectedRoomId ? 'room-button active' : 'room-button'}
+                onClick={() => setSelectedRoomId(room.id)}
+              >
+                <div>{room.date}</div>
+                <div className="small">{room.players.join(' / ')}</div>
+                <div className="small">
+                  {getUmaRule(room.umaRule).label} / {getOkaRule(room.okaRule).label}
+                </div>
+                <div className="small">{room.feeEnabled ? `場代: ${room.feeAmount}` : '場代なし'}</div>
+              </button>
+              <button className="danger room-delete" onClick={() => deleteRoom(room.id)} aria-label="ルーム削除">
+                ×
+              </button>
+            </div>
           ))}
         </div>
       </section>
