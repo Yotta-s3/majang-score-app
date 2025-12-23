@@ -279,10 +279,10 @@ input {
   cursor: not-allowed;
 }
 
-.compact-input {
-  padding: 8px 6px;
+.hand-table .compact-input {
+  padding: 4px 2px;
   font-size: 1rem;
-  text-align: right;
+  text-align: center;
   width: 100%;
 }
 
