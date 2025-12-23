@@ -210,18 +210,23 @@ function App() {
   const [editingHandCreatedAt, setEditingHandCreatedAt] = useState<number | null>(null)
   const [scoreInputs, setScoreInputs] = useState(defaultScoreInputs)
 
-  const rooms = useLiveQuery(() => db.rooms.orderBy('createdAt').reverse().toArray(), [])
-  const selectedRoom = rooms?.find((room) => room.id === selectedRoomId) ?? null
+  const rooms = useLiveQuery(
+    () => db.rooms.orderBy('createdAt').reverse().toArray(),
+    [],
+    [] as Room[],
+  )
+  const selectedRoom = rooms.find((room) => room.id === selectedRoomId) ?? null
   const hands = useLiveQuery(
     () =>
       selectedRoomId
         ? db.hands.where('roomId').equals(selectedRoomId).sortBy('createdAt')
-        : Promise.resolve([]),
+        : Promise.resolve([] as HandRecord[]),
     [selectedRoomId],
+    [] as HandRecord[],
   )
 
   useEffect(() => {
-    if (!selectedRoomId && rooms?.length) {
+    if (!selectedRoomId && rooms.length) {
       setSelectedRoomId(rooms[0].id)
     }
   }, [rooms, selectedRoomId])
@@ -249,7 +254,7 @@ function App() {
   }, [parsedScores, selectedRoom])
 
   const totals = useMemo(() => {
-    if (!selectedRoom || !hands?.length) return defaultScores
+    if (!selectedRoom || !hands.length) return defaultScores
     const totalsBase = [0, 0, 0, 0] as [number, number, number, number]
     hands.forEach((hand) => {
       const { points } = computeHandPoints(selectedRoom, hand.scores)
@@ -440,9 +445,9 @@ function App() {
         <div className="card-title">
           <h2>ルーム一覧</h2>
         </div>
-        {!rooms?.length && <p className="muted">まだルームがありません。</p>}
+        {!rooms.length && <p className="muted">まだルームがありません。</p>}
         <div className="room-list">
-          {rooms?.map((room) => (
+          {rooms.map((room) => (
             <button
               key={room.id}
               className={room.id === selectedRoomId ? 'room-button active' : 'room-button'}
@@ -453,9 +458,7 @@ function App() {
               <div className="small">
                 {getUmaRule(room.umaRule).label} / {getOkaRule(room.okaRule).label}
               </div>
-              <div className="small">
-                {room.feeEnabled ? `場代: ${room.feeAmount}` : '場代なし'}
-              </div>
+              <div className="small">{room.feeEnabled ? `場代: ${room.feeAmount}` : '場代なし'}</div>
             </button>
           ))}
         </div>
@@ -540,7 +543,7 @@ function App() {
                   </td>
                 </tr>
 
-                {!hands?.length && (
+                {!hands.length && (
                   <tr>
                     <td colSpan={selectedRoom.players.length + 2} className="muted">
                       まだ半荘がありません。
@@ -548,7 +551,7 @@ function App() {
                   </tr>
                 )}
 
-                {hands?.map((hand, index) => {
+                {hands.map((hand, index) => {
                   const { points } = computeHandPoints(selectedRoom, hand.scores)
                   const handTotal = sumScores(hand.scores)
                   return (
