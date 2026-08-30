@@ -205,11 +205,13 @@ function App() {
   const updateRoom = async (changes: Partial<Pick<Room, 'name' | 'players'>>) => { if (selectedRoom) await db.rooms.update(selectedRoom.id, { ...changes, updatedAt: new Date().valueOf() }) }
   const updateSessionFee = async (changes: Partial<Pick<Session, 'feeEnabled' | 'feeAmount'>>) => { if (selectedSession) await db.sessions.update(selectedSession.id, { ...changes, updatedAt: new Date().valueOf() }) }
   const exportBackup = async () => {
-    const backup: BackupData = { format: 'mahjong-score-backup', version: BACKUP_FORMAT_VERSION, exportedAt: new Date().toISOString(), rooms: await db.rooms.toArray(), sessions: await db.sessions.toArray(), hands: await db.hands.toArray() }
+    if (!selectedRoom) { setBackupMessage('書き出すルームを選択してください。'); return }
+    const sessions = await db.sessions.where('roomId').equals(selectedRoom.id).toArray()
+    const backup: BackupData = { format: 'mahjong-score-backup', version: BACKUP_FORMAT_VERSION, exportedAt: new Date().toISOString(), rooms: [selectedRoom], sessions, hands: await db.hands.where('roomId').equals(selectedRoom.id).toArray() }
     const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
-    link.href = url; link.download = `${filenameSafe(selectedRoom?.name ?? '全ルーム')}_${backupTimestamp()}.json`; link.click()
+    link.href = url; link.download = `${filenameSafe(selectedRoom.name)}_${backupTimestamp()}.json`; link.click()
     URL.revokeObjectURL(url)
     setBackupMessage(`${backup.rooms.length}件のルームをバックアップしました。`)
   }
@@ -219,15 +221,19 @@ function App() {
     if (!file) return
     try {
       const backup = parseBackup(await file.text())
-      if (!window.confirm(`現在の全データを置き換えます。\nルーム ${backup.rooms.length}件、対局日 ${backup.sessions.length}件、半荘 ${backup.hands.length}件を復元します。\n\n続けますか？`)) return
+      if (!window.confirm(`現在のデータを削除せずに取り込みます。\nルーム ${backup.rooms.length}件、対局日 ${backup.sessions.length}件、半荘 ${backup.hands.length}件を追加・更新します。\n\n続けますか？`)) return
       await db.transaction('rw', db.rooms, db.sessions, db.hands, async () => {
-        await Promise.all([db.rooms.clear(), db.sessions.clear(), db.hands.clear()])
-        await db.rooms.bulkAdd(backup.rooms)
-        await db.sessions.bulkAdd(backup.sessions)
-        await db.hands.bulkAdd(backup.hands)
+        const existingRooms = await db.rooms.bulkGet(backup.rooms.map((room) => room.id))
+        const existingSessions = await db.sessions.bulkGet(backup.sessions.map((session) => session.id))
+        const existingHands = await db.hands.bulkGet(backup.hands.map((hand) => hand.id))
+        const roomsToPut = backup.rooms.filter((room, index) => !existingRooms[index] || room.updatedAt > existingRooms[index].updatedAt)
+        const sessionsToPut = backup.sessions.filter((session, index) => !existingSessions[index] || session.updatedAt > existingSessions[index].updatedAt)
+        const handsToPut = backup.hands.filter((hand, index) => !existingHands[index] || hand.updatedAt > existingHands[index].updatedAt)
+        await db.rooms.bulkPut(roomsToPut)
+        await db.sessions.bulkPut(sessionsToPut)
+        await db.hands.bulkPut(handsToPut)
       })
-      setSelectedRoomId(null); setSelectedSessionId(null); resetHandForm()
-      setBackupMessage('バックアップを復元しました。')
+      setBackupMessage('バックアップを取り込みました。既存の別ルームは保持されています。')
     } catch (error) {
       setBackupMessage(`復元できませんでした: ${error instanceof Error ? error.message : '不明なエラー'}`)
     }
@@ -250,7 +256,7 @@ function App() {
       <label className="field">同点処理<select value={roomTie} onChange={(event) => setRoomTie(event.target.value as TieRuleId)}>{TIE_RULES.map((rule) => <option key={rule.id} value={rule.id}>{rule.label}</option>)}</select></label>
     </div><div className="actions"><button onClick={saveRoom} disabled={!roomCanSave}>ルームを作成</button><button className="ghost" onClick={resetRoomForm}>クリア</button></div></section>
     <section className="card"><div className="card-title"><h2>ルーム一覧</h2></div>{!rooms.length && <p className="muted">まだルームがありません。</p>}<div className="room-list">{rooms.map((room) => <div key={room.id} className="room-item"><button className={room.id === activeRoomId ? 'room-button active' : 'room-button'} onClick={() => { setSelectedRoomId(room.id); resetHandForm() }}><div>{room.name}</div><div className="small">{room.players.join(' / ')}</div><div className="small">最新対局日: {latestDate(room.id) ?? 'なし'}</div><div className="small">{getUmaRule(room.umaRule).label} / {getOkaRule(room.okaRule).label}</div></button><button className="danger room-delete" onClick={() => deleteRoom(room.id)} aria-label="ルーム削除">×</button></div>)}</div></section>
-    <section className="card"><div className="card-title"><h2>バックアップ</h2><span className="small">端末変更・同期前の保全用</span></div><div className="actions"><button className="ghost" onClick={() => void exportBackup()}>JSONを書き出す</button><button className="ghost" onClick={() => backupInputRef.current?.click()}>JSONから復元</button><input ref={backupInputRef} className="visually-hidden" type="file" accept="application/json,.json" onChange={(event) => void importBackup(event)} /></div><p className="small">復元は現在の全データを置き換えます。先に書き出してから実行してください。</p>{backupMessage && <p className="small">{backupMessage}</p>}</section>
+    <section className="card"><div className="card-title"><h2>バックアップ</h2><span className="small">端末変更・同期前の保全用</span></div><div className="actions"><button className="ghost" onClick={() => void exportBackup()} disabled={!selectedRoom}>選択中のルームをJSONに書き出す</button><button className="ghost" onClick={() => backupInputRef.current?.click()}>JSONを取り込む</button><input ref={backupInputRef} className="visually-hidden" type="file" accept="application/json,.json" onChange={(event) => void importBackup(event)} /></div><p className="small">取り込みでは既存データを削除しません。同じIDのデータは更新日時が新しい方を採用します。</p>{backupMessage && <p className="small">{backupMessage}</p>}</section>
     {selectedRoom && <>
       <section className="card" key={selectedRoom.id}><div className="card-title"><h2>ルーム設定</h2><span className="small">入力欄から移動すると保存されます</span></div><div className="grid"><label className="field">ルーム名<input defaultValue={selectedRoom.name} onBlur={(event) => { const name = event.target.value.trim(); if (name && name !== selectedRoom.name) void updateRoom({ name }) }} /></label>{selectedRoom.players.map((player, index) => <label key={index} className="field">プレイヤー{index + 1}<input defaultValue={player} onBlur={(event) => { const name = event.target.value.trim(); if (!name || name === selectedRoom.players[index]) return; const players = [...selectedRoom.players] as Room['players']; players[index] = name; void updateRoom({ players }) }} /></label>)}</div></section>
       <section className="card"><div className="card-title"><h2>{selectedRoom.name} の対局日</h2></div><div className="actions"><label className="field inline-field">日付<input type="date" value={newSessionDate} onChange={(event) => setNewSessionDate(event.target.value)} /></label><label className="field checkbox inline-field">場代計算<input type="checkbox" checked={newSessionFeeEnabled} onChange={(event) => setNewSessionFeeEnabled(event.target.checked)} /></label>{newSessionFeeEnabled && <label className="field inline-field">場代<input type="number" min="1" value={newSessionFeeAmount} onChange={(event) => setNewSessionFeeAmount(event.target.value)} />{newSessionFeeValue === null && <span className="alert-inline">場代を入力してください</span>}</label>}<button onClick={addSession} disabled={newSessionFeeEnabled && newSessionFeeValue === null}>対局日を追加</button></div><div className="session-list">{sessions.map((session) => { const summary = summaries.find((item) => item.session.id === session.id); return <div key={session.id} className={session.id === activeSessionId ? 'session-item active' : 'session-item'}><button onClick={() => { setSelectedSessionId(session.id); resetHandForm() }}><strong>{session.date}</strong><span className="small"> {summary?.hands.length ?? 0} 半荘 / {session.feeEnabled ? `場代 ${session.feeAmount}` : '場代なし'}</span></button><button className="danger" onClick={() => deleteSession(session.id)} aria-label="対局日を削除">×</button></div> })}</div></section>

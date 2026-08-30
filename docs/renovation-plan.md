@@ -69,7 +69,7 @@ Google Drive の共有フォルダ内の JSON をフロントエンドから直�
 
 ## バックアップ仕様
 
-- JSON は `format: "mahjong-score-backup"`、`version: 1` と全 Room / Session / Hand を含む。
+- JSON は `format: "mahjong-score-backup"`、`version: 1` と、選択した1 Room および配下の全 Session / Hand を含む。
 - 復元前に形式・ID重複・親子関係を検証し、不正なファイルでは IndexedDB を変更しない。
-- 復元は全置換のみ。画面で明示確認を行うため、端末変更前・外部同期前にまず JSON を書き出す。
+- 復元は削除なしのマージ。既存の別 Room は保持し、同一IDのレコードは `updatedAt` が新しい方を採用する。
 - 次段階の Apps Script API はこの形式を入出力の土台とし、手動の取得・保存、room 単位の `revision` を追加する。
