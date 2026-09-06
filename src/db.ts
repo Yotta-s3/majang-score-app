@@ -46,10 +46,17 @@ export type HandRecord = {
   updatedAt: number
 }
 
+export type SyncState = {
+  roomId: string
+  revision: number
+  updatedAt: number
+}
+
 class AppDB extends Dexie {
   rooms!: Table<Room, string>
   sessions!: Table<Session, string>
   hands!: Table<HandRecord, string>
+  syncStates!: Table<SyncState, string>
   records!: Table<unknown, string>
 
   constructor() {
@@ -119,6 +126,13 @@ class AppDB extends Dexie {
           })
         }))
       })
+    this.version(5).stores({
+      rooms: 'id, date, createdAt',
+      sessions: 'id, roomId, date, createdAt',
+      hands: 'id, roomId, sessionId, createdAt',
+      syncStates: 'roomId, updatedAt',
+      records: 'id, date, createdAt',
+    })
   }
 }
 
