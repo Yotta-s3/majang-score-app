@@ -51,6 +51,7 @@ export type SyncState = {
   roomId: string
   revision: number
   updatedAt: number
+  syncedAt?: number
 }
 
 class AppDB extends Dexie {

@@ -677,6 +677,7 @@ function App() {
         roomId: selectedRoom.id,
         revision: result.revision ?? 0,
         updatedAt: result.updatedAt ?? Date.now(),
+        syncedAt: Date.now(),
       });
       if (result.shareCode) await db.rooms.update(selectedRoom.id, { shareCode: result.shareCode });
       setSyncMessage("サーバーへ保存しました。");
@@ -701,11 +702,18 @@ function App() {
         );
         return;
       }
-      await mergeRemotePayload(result.payload);
+      await mergeRemotePayload({
+        ...result.payload,
+        room: {
+          ...result.payload.room,
+          shareCode: result.shareCode ?? result.payload.room.shareCode,
+        },
+      });
       await db.syncStates.put({
         roomId: selectedRoom.id,
         revision: result.revision ?? 0,
         updatedAt: result.updatedAt ?? Date.now(),
+        syncedAt: Date.now(),
       });
       setSyncMessage(
         "サーバーのデータを取り込みました。端末内の別ルームは変更していません。",
@@ -726,7 +734,7 @@ function App() {
       const result = await getRemoteRoomByShareCode(shareCode);
       if (!result.ok || !result.payload || !result.roomId) throw new Error(result.error ?? "ルームを取得できませんでした。");
       await mergeRemotePayload({ ...result.payload, room: { ...result.payload.room, shareCode: result.shareCode ?? shareCode } });
-      await db.syncStates.put({ roomId: result.roomId, revision: result.revision ?? 0, updatedAt: result.updatedAt ?? Date.now() });
+      await db.syncStates.put({ roomId: result.roomId, revision: result.revision ?? 0, updatedAt: result.updatedAt ?? Date.now(), syncedAt: Date.now() });
       setIsRoomJoinOpen(false);
       setShareCodeInput("");
       setJoinMessage("");
@@ -883,6 +891,7 @@ function App() {
           />
           <SyncPanel
             shareCode={selectedRoom.shareCode}
+            lastSyncedAt={syncState?.syncedAt ?? syncState?.updatedAt}
             isSyncing={isSyncing}
             message={syncMessage}
             onSave={saveToServer}

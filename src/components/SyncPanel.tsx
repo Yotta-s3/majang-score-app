@@ -2,13 +2,20 @@ import { useState } from 'react'
 
 type SyncPanelProps = {
   shareCode?: string
+  lastSyncedAt?: number
   isSyncing: boolean
   message: string
   onSave: () => Promise<void>
   onLoad: () => Promise<void>
 }
 
-export const SyncPanel = ({ shareCode, isSyncing, message, onSave, onLoad }: SyncPanelProps) => {
+const formatSyncedAt = (timestamp: number) =>
+  new Intl.DateTimeFormat('ja-JP', {
+    dateStyle: 'short',
+    timeStyle: 'short',
+  }).format(timestamp)
+
+export const SyncPanel = ({ shareCode, lastSyncedAt, isSyncing, message, onSave, onLoad }: SyncPanelProps) => {
   const [copyMessage, setCopyMessage] = useState('')
   const copyShareCode = async () => {
     if (!shareCode) return
@@ -33,7 +40,9 @@ export const SyncPanel = ({ shareCode, isSyncing, message, onSave, onLoad }: Syn
       </button>
     </div>
     {shareCode && <div className="share-code"><span className="small">共有コード: <strong>{shareCode}</strong></span><button className="ghost" onClick={() => void copyShareCode()}>コピー</button></div>}
+    {lastSyncedAt && <p className="small">最終同期: {formatSyncedAt(lastSyncedAt)}</p>}
     {copyMessage && <p className="small">{copyMessage}</p>}
-    {message && <p className="small">{message}</p>}
+    {isSyncing && <p className="small" role="status">同期しています…</p>}
+    {message && <p className="small" role={message.includes('できません') ? 'alert' : undefined}>{message}</p>}
   </section>
 }
