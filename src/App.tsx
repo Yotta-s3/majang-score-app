@@ -202,7 +202,8 @@ function App() {
   const [highlightedPlayerIndex, setHighlightedPlayerIndex] = useState<
     number | null
   >(null);
-  const [backupMessage, setBackupMessage] = useState("");
+  const [exportMessage, setExportMessage] = useState("");
+  const [importMessage, setImportMessage] = useState("");
   const [syncMessage, setSyncMessage] = useState("");
   const [isSyncing, setIsSyncing] = useState(false);
   const [hash, setHash] = useState(() => window.location.hash);
@@ -513,7 +514,7 @@ function App() {
   };
   const exportBackup = async () => {
     if (!selectedRoom) {
-      setBackupMessage("書き出すルームを選択してください。");
+      setExportMessage("書き出すルームを選択してください。");
       return;
     }
     const sessions = await db.sessions
@@ -537,7 +538,7 @@ function App() {
     link.download = `${filenameSafe(selectedRoom.name)}_${backupTimestamp()}.json`;
     link.click();
     URL.revokeObjectURL(url);
-    setBackupMessage(
+    setExportMessage(
       `${backup.rooms.length}件のルームをバックアップしました。`,
     );
   };
@@ -553,6 +554,7 @@ function App() {
         )
       )
         return;
+      let updatedExistingRoom = false;
       await db.transaction("rw", db.rooms, db.sessions, db.hands, async () => {
         const existingRooms = await db.rooms.bulkGet(
           backup.rooms.map((room) => room.id),
@@ -568,6 +570,11 @@ function App() {
             !existingRooms[index] ||
             room.updatedAt > existingRooms[index].updatedAt,
         );
+        updatedExistingRoom = backup.rooms.some(
+          (room, index) =>
+            Boolean(existingRooms[index]) &&
+            room.updatedAt > existingRooms[index]!.updatedAt,
+        );
         const sessionsToPut = backup.sessions.filter(
           (session, index) =>
             !existingSessions[index] ||
@@ -582,11 +589,9 @@ function App() {
         await db.sessions.bulkPut(sessionsToPut);
         await db.hands.bulkPut(handsToPut);
       });
-      setBackupMessage(
-        "バックアップを取り込みました。既存の別ルームは保持されています。",
-      );
+      setImportMessage(updatedExistingRoom ? "既存のルームを更新しました。" : "バックアップを取り込みました。");
     } catch (error) {
-      setBackupMessage(
+      setImportMessage(
         `復元できませんでした: ${error instanceof Error ? error.message : "不明なエラー"}`,
       );
     }
@@ -765,7 +770,7 @@ function App() {
       {isHomeView && (
         <>
           <RoomAddPanel
-            message={backupMessage}
+            message={importMessage}
             onCreate={() => setIsRoomCreateOpen(true)}
             onImport={importBackup}
           />
@@ -813,7 +818,7 @@ function App() {
         <>
           <div hidden={isAnalysisView}>
           <BackupPanel
-            message={backupMessage}
+            message={exportMessage}
             onExport={exportBackup}
           />
           <SyncPanel
@@ -826,7 +831,6 @@ function App() {
           <section className="card" key={selectedRoom.id}>
             <div className="card-title">
               <h2>ルーム設定</h2>
-              <span className="small">入力欄から移動すると保存されます</span>
             </div>
             <div className="small">
               <strong>ルール:</strong> {getUmaRule(selectedRoom.umaRule).label} /{" "}
@@ -1011,17 +1015,8 @@ function App() {
           <section className="card">
             <div className="card-title">
               <h2>分析対象の対局日</h2>
-              <button
-                className="ghost"
-                onClick={() => {
-                  setAnalysisStartSessionId("");
-                  setAnalysisEndSessionId("");
-                }}
-              >
-                全対局日
-              </button>
             </div>
-            <div className="actions">
+            <div className="actions analysis-range-actions">
               <label className="field inline-field">
                 開始日
                 <select
@@ -1046,20 +1041,24 @@ function App() {
                   ))}
                 </select>
               </label>
+              <button
+                className="ghost"
+                onClick={() => {
+                  setAnalysisStartSessionId("");
+                  setAnalysisEndSessionId("");
+                }}
+              >
+                クリア
+              </button>
             </div>
-            {hasInvalidAnalysisRange ? (
+            {hasInvalidAnalysisRange && (
               <p className="alert-inline">開始日は終了日以前を選択してください。</p>
-            ) : (
-              <p className="small">
-                {analysisStartDate ?? "最初"} から {analysisEndDate ?? "最後"} までの成績を表示しています。
-              </p>
             )}
           </section>
           <section className="card">
             <div className="card-title">
               <h2>通算成績</h2>
               <div className="compact-meta">
-                <span className="small">指定した対局日を合算</span>
                 {hasSessionFees && (
                   <label className="field checkbox inline-field">
                     総場代を表示

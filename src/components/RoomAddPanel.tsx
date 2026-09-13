@@ -17,7 +17,6 @@ export const RoomAddPanel = ({ message, onCreate, onImport }: RoomAddPanelProps)
         <button className="ghost" onClick={onCreate}>新規にルーム作成</button>
         <input ref={inputRef} className="visually-hidden" type="file" accept="application/json,.json" onChange={(event) => void onImport(event)} />
       </div>
-      <p className="small">JSON取り込みは、同じIDのRoomがあれば新しいデータで更新します。</p>
       {message && <p className="small">{message}</p>}
     </section>
   )
