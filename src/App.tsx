@@ -12,7 +12,7 @@ import {
   type UmaRuleId,
 } from "./db";
 import { BACKUP_FORMAT_VERSION, parseBackup, type BackupData } from "./backup";
-import { getRemoteRoom, saveRemoteRoom, type RoomSyncPayload } from "./sync";
+import { getRemoteRoom, getRemoteRoomByShareCode, saveRemoteRoom, type RoomSyncPayload } from "./sync";
 import {
   computeHandPoints,
   getTieGroups,
@@ -185,6 +185,9 @@ function App() {
   const [roomOka, setRoomOka] = useState<OkaRuleId>("oka20");
   const [roomTie, setRoomTie] = useState<TieRuleId>("split");
   const [isRoomCreateOpen, setIsRoomCreateOpen] = useState(false);
+  const [isRoomJoinOpen, setIsRoomJoinOpen] = useState(false);
+  const [shareCodeInput, setShareCodeInput] = useState("");
+  const [joinMessage, setJoinMessage] = useState("");
   const [newSessionDate, setNewSessionDate] = useState(todayString);
   const [newSessionFeeEnabled, setNewSessionFeeEnabled] = useState(false);
   const [newSessionFeeAmount, setNewSessionFeeAmount] = useState("");
@@ -651,6 +654,7 @@ function App() {
         revision: result.revision ?? 0,
         updatedAt: result.updatedAt ?? Date.now(),
       });
+      if (result.shareCode) await db.rooms.update(selectedRoom.id, { shareCode: result.shareCode });
       setSyncMessage("サーバーへ保存しました。");
     } catch (error) {
       setSyncMessage(
@@ -688,6 +692,23 @@ function App() {
       );
     } finally {
       setIsSyncing(false);
+    }
+  };
+  const joinRoomByShareCode = async () => {
+    const shareCode = shareCodeInput.trim().toUpperCase();
+    if (!shareCode) { setJoinMessage("共有コードを入力してください。"); return; }
+    setJoinMessage("ルームを取得しています…");
+    try {
+      const result = await getRemoteRoomByShareCode(shareCode);
+      if (!result.ok || !result.payload || !result.roomId) throw new Error(result.error ?? "ルームを取得できませんでした。");
+      await mergeRemotePayload({ ...result.payload, room: { ...result.payload.room, shareCode: result.shareCode ?? shareCode } });
+      await db.syncStates.put({ roomId: result.roomId, revision: result.revision ?? 0, updatedAt: result.updatedAt ?? Date.now() });
+      setIsRoomJoinOpen(false);
+      setShareCodeInput("");
+      setJoinMessage("");
+      window.location.hash = `/room/${encodeURIComponent(result.roomId)}`;
+    } catch (error) {
+      setJoinMessage(error instanceof Error ? error.message : "ルームを取得できませんでした。");
     }
   };
   const selectTieRank = (
@@ -772,6 +793,7 @@ function App() {
           <RoomAddPanel
             message={importMessage}
             onCreate={() => setIsRoomCreateOpen(true)}
+            onJoin={() => setIsRoomJoinOpen(true)}
             onImport={importBackup}
           />
           <RoomList
@@ -814,6 +836,18 @@ function App() {
           </div>
         </div>
       )}
+      {isRoomJoinOpen && (
+        <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setIsRoomJoinOpen(false); }}>
+          <div className="modal join-modal" role="dialog" aria-modal="true" aria-labelledby="room-join-title">
+            <div className="modal-title"><h2 id="room-join-title">共有コードで参加</h2><button className="ghost" onClick={() => setIsRoomJoinOpen(false)} aria-label="閉じる">×</button></div>
+            <div className="modal-content">
+              <label className="field">共有コード<input value={shareCodeInput} onChange={(event) => setShareCodeInput(event.target.value.toUpperCase())} maxLength={8} autoCapitalize="characters" /></label>
+              <div className="actions"><button onClick={() => void joinRoomByShareCode()}>参加する</button></div>
+              {joinMessage && <p className="small">{joinMessage}</p>}
+            </div>
+          </div>
+        </div>
+      )}
       {selectedRoom && isRoomView && (
         <>
           <div hidden={isAnalysisView}>
@@ -823,6 +857,7 @@ function App() {
           />
           <SyncPanel
             revision={syncState?.revision ?? 0}
+            shareCode={selectedRoom.shareCode}
             isSyncing={isSyncing}
             message={syncMessage}
             onSave={saveToServer}

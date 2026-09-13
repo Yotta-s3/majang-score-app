@@ -9,7 +9,7 @@ type TokenClient = { requestAccessToken: (options?: { prompt?: '' | 'consent' })
 declare global { interface Window { google?: { accounts: { oauth2: { initTokenClient: (config: { client_id: string; scope: string; callback: (response: TokenResponse) => void }) => TokenClient } } } } }
 
 export type RoomSyncPayload = { room: Room; sessions: Session[]; hands: HandRecord[] }
-type ApiResponse = { ok: boolean; error?: string; code?: 'conflict'; roomId?: string; revision?: number; updatedAt?: number; payload?: RoomSyncPayload | null }
+type ApiResponse = { ok: boolean; error?: string; code?: 'conflict'; roomId?: string; shareCode?: string; revision?: number; updatedAt?: number; payload?: RoomSyncPayload | null }
 
 const token = () => new Promise<string>((resolve, reject) => {
   if (!window.google?.accounts.oauth2) { reject(new Error('Googleログインの準備中です。数秒待ってから再試行してください。')); return }
@@ -17,7 +17,7 @@ const token = () => new Promise<string>((resolve, reject) => {
   client.requestAccessToken({ prompt: 'consent' })
 })
 
-const run = async (functionName: 'getRoom' | 'saveRoom', parameters: unknown[]): Promise<ApiResponse> => {
+const run = async (functionName: 'getRoom' | 'getRoomByShareCode' | 'saveRoom', parameters: unknown[]): Promise<ApiResponse> => {
   const response = await fetch(`https://script.googleapis.com/v1/scripts/${SCRIPT_ID}:run`, { method: 'POST', headers: { Authorization: `Bearer ${await token()}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ function: functionName, parameters }) })
   const body = await response.json() as { response?: { result?: ApiResponse }; error?: { message?: string } }
   if (!response.ok || body.error) throw new Error(body.error?.message ?? `通信に失敗しました (${response.status})。`)
@@ -26,4 +26,5 @@ const run = async (functionName: 'getRoom' | 'saveRoom', parameters: unknown[]):
 }
 
 export const getRemoteRoom = (roomId: string) => run('getRoom', [roomId])
+export const getRemoteRoomByShareCode = (shareCode: string) => run('getRoomByShareCode', [shareCode])
 export const saveRemoteRoom = (roomId: string, baseRevision: number, payload: RoomSyncPayload) => run('saveRoom', [{ roomId, baseRevision, payload }])

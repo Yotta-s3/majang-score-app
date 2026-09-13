@@ -37,6 +37,8 @@
   box-shadow: none;
 }
 
+.modal-content { padding: 12px; }
+
 .header {
   display: grid;
   gap: 6px;
@@ -262,6 +264,12 @@ input {
 
 .analysis-range-actions > button {
   align-self: flex-end;
+}
+
+.share-code {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .tie-break {

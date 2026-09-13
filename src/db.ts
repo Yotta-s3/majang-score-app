@@ -6,6 +6,7 @@ export type TieRuleId = 'split' | 'seat'
 
 export type Room = {
   id: string
+  shareCode?: string
   /** v2 の対局日。v3 以降は Session.date を使用する。 */
   date?: string
   name: string
