@@ -1,7 +1,6 @@
 import { useState } from 'react'
 
 type SyncPanelProps = {
-  revision: number
   shareCode?: string
   isSyncing: boolean
   message: string
@@ -9,7 +8,7 @@ type SyncPanelProps = {
   onLoad: () => Promise<void>
 }
 
-export const SyncPanel = ({ revision, shareCode, isSyncing, message, onSave, onLoad }: SyncPanelProps) => {
+export const SyncPanel = ({ shareCode, isSyncing, message, onSave, onLoad }: SyncPanelProps) => {
   const [copyMessage, setCopyMessage] = useState('')
   const copyShareCode = async () => {
     if (!shareCode) return
@@ -33,9 +32,6 @@ export const SyncPanel = ({ revision, shareCode, isSyncing, message, onSave, onL
         サーバーから取得
       </button>
     </div>
-    <p className="small">
-      同期リビジョン: {revision}。競合時は上書きせず停止します。
-    </p>
     {shareCode && <div className="share-code"><span className="small">共有コード: <strong>{shareCode}</strong></span><button className="ghost" onClick={() => void copyShareCode()}>コピー</button></div>}
     {copyMessage && <p className="small">{copyMessage}</p>}
     {message && <p className="small">{message}</p>}

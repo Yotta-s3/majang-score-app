@@ -32,7 +32,7 @@ import { HandTable } from "./components/HandTable";
 import { SyncPanel } from "./components/SyncPanel";
 import "./App.css";
 
-const defaultPlayers: [string, string, string, string] = ["A", "B", "C", "D"];
+const defaultPlayers: [string, string, string, string] = ["", "", "", ""];
 const defaultScoreInputs: [string, string, string, string] = ["", "", "", ""];
 type TieRankSelection = { score: number; playerRanks: Record<number, number> };
 const todayString = () => new Date().toISOString().slice(0, 10);
@@ -353,6 +353,7 @@ function App() {
   const newSessionFeeValue = parsePositiveInt(newSessionFeeAmount);
   const roomCanSave =
     roomName.trim().length > 0 && roomPlayers.every((player) => player.trim());
+  const roomValidationMessage = "未入力の項目があります。";
   const hasSessionFees = analysisSummaries.some(
     (summary) => summary.session.feeEnabled,
   );
@@ -478,6 +479,13 @@ function App() {
     if (activeSessionId === sessionId) resetHandForm();
   };
   const deleteRoom = async (roomId: string) => {
+    const room = rooms.find((item) => item.id === roomId);
+    if (
+      !window.confirm(
+        `「${room?.name ?? "このルーム"}」を削除します。\n配下の対局日と半荘記録も削除されます。\n\n続けますか？`,
+      )
+    )
+      return;
     await db.transaction(
       "rw",
       db.rooms,
@@ -813,9 +821,8 @@ function App() {
             if (event.target === event.currentTarget) setIsRoomCreateOpen(false);
           }}
         >
-          <div className="modal" role="dialog" aria-modal="true" aria-labelledby="room-create-title">
+          <div className="modal" role="dialog" aria-modal="true" aria-label="ルーム作成">
             <div className="modal-title">
-              <h2 id="room-create-title">ルーム作成</h2>
               <button className="ghost" onClick={() => setIsRoomCreateOpen(false)} aria-label="閉じる">×</button>
             </div>
             <RoomForm
@@ -825,6 +832,7 @@ function App() {
               oka={roomOka}
               tie={roomTie}
               canSave={roomCanSave}
+              validationMessage={roomValidationMessage}
               onNameChange={setRoomName}
               onPlayersChange={setRoomPlayers}
               onUmaChange={setRoomUma}
@@ -856,7 +864,6 @@ function App() {
             onExport={exportBackup}
           />
           <SyncPanel
-            revision={syncState?.revision ?? 0}
             shareCode={selectedRoom.shareCode}
             isSyncing={isSyncing}
             message={syncMessage}

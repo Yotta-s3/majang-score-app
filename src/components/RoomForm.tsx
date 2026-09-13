@@ -8,6 +8,7 @@ type RoomFormProps = {
   oka: OkaRuleId
   tie: TieRuleId
   canSave: boolean
+  validationMessage: string
   onNameChange: (name: string) => void
   onPlayersChange: (players: Room['players']) => void
   onUmaChange: (uma: UmaRuleId) => void
@@ -18,7 +19,7 @@ type RoomFormProps = {
 }
 
 export const RoomForm = ({
-  name, players, uma, oka, tie, canSave,
+  name, players, uma, oka, tie, canSave, validationMessage,
   onNameChange, onPlayersChange, onUmaChange, onOkaChange, onTieChange, onSave, onClear,
 }: RoomFormProps) => (
   <section className="card">
@@ -28,14 +29,16 @@ export const RoomForm = ({
     <div className="grid">
       <label className="field">
         ルーム名
-        <input value={name} onChange={(event) => onNameChange(event.target.value)} placeholder="例: 金曜麻雀" />
+        <input className={!name.trim() ? 'input-invalid' : undefined} aria-invalid={!name.trim()} value={name} onChange={(event) => onNameChange(event.target.value)} placeholder="例: 金曜麻雀" />
+        {!name.trim() && <span className="alert-inline">ルーム名を入力してください。</span>}
       </label>
       <div className="grid">
         {players.map((player, index) => (
           <label key={index} className="field">
             プレイヤー{index + 1}
             <input
-              className="name"
+              className={`name${!player.trim() ? ' input-invalid' : ''}`}
+              aria-invalid={!player.trim()}
               value={player}
               onChange={(event) => {
                 const next = [...players] as Room['players']
@@ -43,6 +46,7 @@ export const RoomForm = ({
                 onPlayersChange(next)
               }}
             />
+            {!player.trim() && <span className="alert-inline">プレイヤー名を入力してください。</span>}
           </label>
         ))}
       </div>
@@ -69,5 +73,6 @@ export const RoomForm = ({
       <button onClick={onSave} disabled={!canSave}>ルームを作成</button>
       <button className="ghost" onClick={onClear}>クリア</button>
     </div>
+    {!canSave && <p className="small">{validationMessage}</p>}
   </section>
 )
