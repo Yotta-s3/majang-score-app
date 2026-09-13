@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import {
   db,
@@ -13,37 +13,27 @@ import {
 } from "./db";
 import { BACKUP_FORMAT_VERSION, parseBackup, type BackupData } from "./backup";
 import { getRemoteRoom, saveRemoteRoom, type RoomSyncPayload } from "./sync";
+import {
+  computeHandPoints,
+  getTieGroups,
+  getOkaRule,
+  getUmaRule,
+  hasSelectedTieOrder,
+  resolveTieOrder,
+  type TieGroup,
+} from "./domain/scoring";
+import { createSessionSummary } from "./domain/analytics";
+import { BackupPanel } from "./components/BackupPanel";
+import { RoomList } from "./components/RoomList";
+import { RoomForm } from "./components/RoomForm";
+import { SessionPanel } from "./components/SessionPanel";
+import { HandTable } from "./components/HandTable";
+import { SyncPanel } from "./components/SyncPanel";
 import "./App.css";
 
-const UMA_RULES: Array<{
-  id: UmaRuleId;
-  label: string;
-  bonuses: [number, number, number, number];
-}> = [
-  { id: "5-10", label: "ゴットー (5-10)", bonuses: [10, 5, -5, -10] },
-  { id: "10-20", label: "ワンツー (10-20)", bonuses: [20, 10, -10, -20] },
-  { id: "10-30", label: "ワンスリー (10-30)", bonuses: [30, 10, -10, -30] },
-];
-const OKA_RULES: Array<{
-  id: OkaRuleId;
-  label: string;
-  base: number;
-  oka: number;
-}> = [
-  {
-    id: "oka20",
-    label: "オカあり (25000持ち/30000返し +20)",
-    base: 30000,
-    oka: 20,
-  },
-  { id: "oka0", label: "オカなし (25000持ち/25000返し)", base: 25000, oka: 0 },
-];
-const TIE_RULES: Array<{ id: TieRuleId; label: string }> = [
-  { id: "split", label: "同点は同着" },
-  { id: "seat", label: "同点は席順" },
-];
 const defaultPlayers: [string, string, string, string] = ["A", "B", "C", "D"];
 const defaultScoreInputs: [string, string, string, string] = ["", "", "", ""];
+type TieRankSelection = { score: number; playerRanks: Record<number, number> };
 const todayString = () => new Date().toISOString().slice(0, 10);
 const backupTimestamp = () => {
   const now = new Date();
@@ -65,137 +55,6 @@ const parsePositiveInt = (value: string) =>
   /^[1-9]\d*$/.test(value.trim()) ? Number.parseInt(value, 10) : null;
 const formatAmount = (value: number) =>
   Number.isInteger(value) ? String(value) : value.toFixed(1);
-const getUmaRule = (id: UmaRuleId) =>
-  UMA_RULES.find((rule) => rule.id === id) ?? UMA_RULES[0];
-const getOkaRule = (id: OkaRuleId) =>
-  OKA_RULES.find((rule) => rule.id === id) ?? OKA_RULES[0];
-
-type TieGroup = { score: number; playerIndexes: number[] };
-const getTieGroups = (scores: number[]): TieGroup[] => {
-  const groups = new Map<number, number[]>();
-  scores.forEach((score, index) =>
-    groups.set(score, [...(groups.get(score) ?? []), index]),
-  );
-  return [...groups.entries()]
-    .filter(([, playerIndexes]) => playerIndexes.length > 1)
-    .map(([score, playerIndexes]) => ({ score, playerIndexes }));
-};
-const resolveTieOrder = (group: TieGroup, orders?: TieBreakOrder[]) => {
-  const saved = orders?.find(
-    (order) => order.score === group.score,
-  )?.playerIndexes;
-  return saved &&
-    saved.length === group.playerIndexes.length &&
-    saved.every((index) => group.playerIndexes.includes(index))
-    ? saved
-    : group.playerIndexes;
-};
-
-const computeHandPoints = (
-  room: Room,
-  scores: number[],
-  tieBreakOrders?: TieBreakOrder[],
-) => {
-  const uma = getUmaRule(room.umaRule);
-  const oka = getOkaRule(room.okaRule);
-  const tieOrderByPlayer = new Map<number, number>();
-  getTieGroups(scores).forEach((group) =>
-    resolveTieOrder(group, tieBreakOrders).forEach((player, position) =>
-      tieOrderByPlayer.set(player, position),
-    ),
-  );
-  const items = scores
-    .map((score, index) => ({ score, index }))
-    .sort((a, b) =>
-      b.score !== a.score
-        ? b.score - a.score
-        : (tieOrderByPlayer.get(a.index) ?? a.index) -
-          (tieOrderByPlayer.get(b.index) ?? b.index),
-    );
-  const ranks = Array(scores.length).fill(0) as number[];
-  const bonuses = Array(scores.length).fill(0) as number[];
-  if (room.tieRule === "seat") {
-    items.forEach((item, position) => {
-      ranks[item.index] = position + 1;
-      bonuses[item.index] =
-        uma.bonuses[position] + (position === 0 ? oka.oka : 0);
-    });
-  } else {
-    let position = 0;
-    while (position < items.length) {
-      const group = items.filter(
-        (item) => item.score === items[position].score,
-      );
-      const start = position;
-      const bonus =
-        sum(
-          group.map(
-            (_, offset) =>
-              uma.bonuses[start + offset] +
-              (start + offset === 0 ? oka.oka : 0),
-          ),
-        ) / group.length;
-      group.forEach((item) => {
-        ranks[item.index] = start + 1;
-        bonuses[item.index] = bonus;
-      });
-      position += group.length;
-    }
-  }
-  return {
-    ranks,
-    points: scores.map(
-      (score, index) => (score - oka.base) / 1000 + bonuses[index],
-    ),
-  };
-};
-
-/** 通算・日別成績は席順を使わず、同点を同着として扱う。 */
-const computeAggregateRanks = (totals: number[]) => {
-  const sorted = totals
-    .map((total, index) => ({ total, index }))
-    .sort((a, b) => b.total - a.total);
-  const ranks = Array(totals.length).fill(0) as number[];
-  let position = 0;
-  while (position < sorted.length) {
-    const group = sorted.filter(
-      (item) => item.total === sorted[position].total,
-    );
-    group.forEach((item) => {
-      ranks[item.index] = position + 1;
-    });
-    position += group.length;
-  }
-  return ranks;
-};
-const computeFeeShares = (totals: number[], amount: number) => {
-  const weights = [0, 1 / 6, 2 / 6, 3 / 6];
-  const sorted = totals
-    .map((total, index) => ({ total, index }))
-    .sort((a, b) => b.total - a.total);
-  const shares = Array(totals.length).fill(0) as number[];
-  let position = 0;
-  while (position < sorted.length) {
-    const group = sorted.filter(
-      (item) => item.total === sorted[position].total,
-    );
-    const share =
-      sum(group.map((_, offset) => weights[position + offset])) / group.length;
-    group.forEach((item) => {
-      shares[item.index] = amount * share;
-    });
-    position += group.length;
-  }
-  return shares;
-};
-
-type SessionSummary = {
-  session: Session;
-  hands: HandRecord[];
-  totals: number[];
-  ranks: number[];
-  feeShares: number[];
-};
 type PointSeries = { date: string; totals: number[] };
 const PointTrendChart = ({
   series,
@@ -314,32 +173,7 @@ const PointTrendChart = ({
     </>
   );
 };
-const createSessionSummary = (
-  room: Room,
-  session: Session,
-  hands: HandRecord[],
-): SessionSummary => {
-  const totals = [0, 0, 0, 0];
-  hands.forEach((hand) =>
-    computeHandPoints(room, hand.scores, hand.tieBreakOrders).points.forEach(
-      (point, index) => {
-        totals[index] += point;
-      },
-    ),
-  );
-  return {
-    session,
-    hands,
-    totals,
-    ranks: computeAggregateRanks(totals),
-    feeShares: session.feeEnabled
-      ? computeFeeShares(totals, session.feeAmount)
-      : [0, 0, 0, 0],
-  };
-};
-
 function App() {
-  const backupInputRef = useRef<HTMLInputElement>(null);
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(
     null,
@@ -358,7 +192,11 @@ function App() {
   >(null);
   const [scoreInputs, setScoreInputs] = useState(defaultScoreInputs);
   const [tieBreakOrders, setTieBreakOrders] = useState<TieBreakOrder[]>([]);
+  const [tieRankSelections, setTieRankSelections] = useState<TieRankSelection[]>([]);
+  const [tieBreakMessage, setTieBreakMessage] = useState("");
   const [showTotalFees, setShowTotalFees] = useState(false);
+  const [analysisStartSessionId, setAnalysisStartSessionId] = useState("");
+  const [analysisEndSessionId, setAnalysisEndSessionId] = useState("");
   const [highlightedPlayerIndex, setHighlightedPlayerIndex] = useState<
     number | null
   >(null);
@@ -433,8 +271,11 @@ function App() {
   const scoreTotal = scoreReady ? sum(parsedScores as number[]) : null;
   const scoreOk = scoreTotal === 100000;
   const tieGroups = scoreReady ? getTieGroups(parsedScores as number[]) : [];
+  const requiresTieBreakSelection =
+    selectedRoom?.tieRule === "seat" &&
+    tieGroups.some((group) => !hasSelectedTieOrder(group, tieBreakOrders));
   const handPreview =
-    selectedRoom && scoreReady
+    selectedRoom && scoreReady && !requiresTieBreakSelection
       ? computeHandPoints(
           selectedRoom,
           parsedScores as number[],
@@ -453,18 +294,35 @@ function App() {
   const selectedSummary = summaries.find(
     (summary) => summary.session.id === activeSessionId,
   );
+  const analysisStartDate = sessions.find(
+    (session) => session.id === analysisStartSessionId,
+  )?.date;
+  const analysisEndDate = sessions.find(
+    (session) => session.id === analysisEndSessionId,
+  )?.date;
+  const hasInvalidAnalysisRange =
+    Boolean(analysisStartDate && analysisEndDate) &&
+    analysisStartDate! > analysisEndDate!;
+  const analysisSummaries = hasInvalidAnalysisRange
+    ? []
+    : summaries.filter(
+        (summary) =>
+          (!analysisStartDate || summary.session.date >= analysisStartDate) &&
+          (!analysisEndDate || summary.session.date <= analysisEndDate),
+      );
+  const analysisHands = analysisSummaries.flatMap((summary) => summary.hands);
   const playerStats = !selectedRoom
     ? []
     : selectedRoom.players.map((player, index) => {
-        const handResults = roomHands.map((hand) =>
+        const handResults = analysisHands.map((hand) =>
           computeHandPoints(selectedRoom, hand.scores, hand.tieBreakOrders),
         );
         const ranks = handResults.map((result) => result.ranks[index]);
         const totalPoints = sum(
-          summaries.map((summary) => summary.totals[index]),
+          analysisSummaries.map((summary) => summary.totals[index]),
         );
-        const finalScores = roomHands.map((hand) => hand.scores[index]);
-        const sessionCount = summaries.filter(
+        const finalScores = analysisHands.map((hand) => hand.scores[index]);
+        const sessionCount = analysisSummaries.filter(
           (summary) => summary.hands.length > 0,
         ).length;
         return {
@@ -475,14 +333,16 @@ function App() {
           averageRank: ranks.length ? sum(ranks) / ranks.length : 0,
           ranks,
           finalScores,
-          fee: sum(summaries.map((summary) => summary.feeShares[index])),
+          fee: sum(analysisSummaries.map((summary) => summary.feeShares[index])),
         };
       });
   const newSessionFeeValue = parsePositiveInt(newSessionFeeAmount);
   const roomCanSave =
     roomName.trim().length > 0 && roomPlayers.every((player) => player.trim());
-  const hasSessionFees = sessions.some((session) => session.feeEnabled);
-  const dailyPointSeries = summaries
+  const hasSessionFees = analysisSummaries.some(
+    (summary) => summary.session.feeEnabled,
+  );
+  const dailyPointSeries = analysisSummaries
     .filter((summary) => summary.hands.length > 0)
     .map((summary) => ({ date: summary.session.date, totals: summary.totals }));
   const totalPointSeries = dailyPointSeries.reduce<PointSeries[]>(
@@ -510,6 +370,8 @@ function App() {
     setEditingHandCreatedAt(null);
     setScoreInputs(defaultScoreInputs);
     setTieBreakOrders([]);
+    setTieRankSelections([]);
+    setTieBreakMessage("");
   };
   const saveRoom = async () => {
     if (!roomCanSave) return;
@@ -551,6 +413,10 @@ function App() {
   };
   const saveHand = async () => {
     if (!activeRoomId || !activeSessionId || !scoreOk) return;
+    if (requiresTieBreakSelection) {
+      setTieBreakMessage("同点者の上位順を確定してから保存してください。");
+      return;
+    }
     const now = new Date().valueOf();
     const hand: HandRecord = {
       id: editingHandId ?? makeId(),
@@ -577,6 +443,14 @@ function App() {
       hand.scores.map(formatScoreInput) as typeof defaultScoreInputs,
     );
     setTieBreakOrders(hand.tieBreakOrders ?? []);
+    setTieRankSelections(
+      (hand.tieBreakOrders ?? []).map((order) => ({
+        score: order.score,
+        playerRanks: Object.fromEntries(
+          order.playerIndexes.map((playerIndex, position) => [playerIndex, position + 1]),
+        ) as Record<number, number>,
+      })),
+    );
   };
   const deleteHand = async (id: string) => {
     await db.hands.delete(id);
@@ -799,23 +673,34 @@ function App() {
       setIsSyncing(false);
     }
   };
-  const moveTiePlayer = (
+  const selectTieRank = (
     group: TieGroup,
+    rankStart: number,
     playerIndex: number,
-    direction: -1 | 1,
+    rank: number,
   ) => {
-    const order = [...resolveTieOrder(group, tieBreakOrders)];
-    const position = order.indexOf(playerIndex);
-    const nextPosition = position + direction;
-    if (nextPosition < 0 || nextPosition >= order.length) return;
-    [order[position], order[nextPosition]] = [
-      order[nextPosition],
-      order[position],
-    ];
+    const current = tieRankSelections.find((selection) => selection.score === group.score);
+    const playerRanks = { ...(current?.playerRanks ?? {}), [playerIndex]: rank };
+    const selectedRanks = group.playerIndexes.map((index) => playerRanks[index]);
+    const isComplete =
+      selectedRanks.every(
+        (value) =>
+          Number.isInteger(value) &&
+          value >= rankStart &&
+          value < rankStart + group.playerIndexes.length,
+      ) &&
+      new Set(selectedRanks).size === group.playerIndexes.length;
+    setTieRankSelections((selections) => [
+      ...selections.filter((selection) => selection.score !== group.score),
+      { score: group.score, playerRanks },
+    ]);
     setTieBreakOrders((orders) => [
       ...orders.filter((order) => order.score !== group.score),
-      { score: group.score, playerIndexes: order },
+      ...(isComplete
+        ? [{ score: group.score, playerIndexes: [...group.playerIndexes].sort((a, b) => playerRanks[a] - playerRanks[b]) }]
+        : []),
     ]);
+    setTieBreakMessage("");
   };
   const latestDate = (roomId: string) =>
     allSessions
@@ -864,182 +749,54 @@ function App() {
       </header>
       {isHomeView && (
         <>
-          <section className="card">
-            <div className="card-title">
-              <h2>ルーム作成</h2>
-            </div>
-            <div className="grid">
-              <label className="field">
-                ルーム名
-                <input
-                  value={roomName}
-                  onChange={(event) => setRoomName(event.target.value)}
-                  placeholder="例: 金曜麻雀"
-                />
-              </label>
-              <div className="grid">
-                {roomPlayers.map((player, index) => (
-                  <label key={index} className="field">
-                    プレイヤー{index + 1}
-                    <input
-                      className="name"
-                      value={player}
-                      onChange={(event) => {
-                        const next = [...roomPlayers] as typeof roomPlayers;
-                        next[index] = event.target.value;
-                        setRoomPlayers(next);
-                      }}
-                    />
-                  </label>
-                ))}
-              </div>
-              <label className="field">
-                ウマ
-                <select
-                  value={roomUma}
-                  onChange={(event) =>
-                    setRoomUma(event.target.value as UmaRuleId)
-                  }
-                >
-                  {UMA_RULES.map((rule) => (
-                    <option key={rule.id} value={rule.id}>
-                      {rule.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="field">
-                オカ
-                <select
-                  value={roomOka}
-                  onChange={(event) =>
-                    setRoomOka(event.target.value as OkaRuleId)
-                  }
-                >
-                  {OKA_RULES.map((rule) => (
-                    <option key={rule.id} value={rule.id}>
-                      {rule.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="field">
-                同点処理
-                <select
-                  value={roomTie}
-                  onChange={(event) =>
-                    setRoomTie(event.target.value as TieRuleId)
-                  }
-                >
-                  {TIE_RULES.map((rule) => (
-                    <option key={rule.id} value={rule.id}>
-                      {rule.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-            <div className="actions">
-              <button onClick={saveRoom} disabled={!roomCanSave}>
-                ルームを作成
-              </button>
-              <button className="ghost" onClick={resetRoomForm}>
-                クリア
-              </button>
-            </div>
-          </section>
-          <section className="card">
-            <div className="card-title">
-              <h2>ルーム一覧</h2>
-            </div>
-            {!rooms.length && <p className="muted">まだルームがありません。</p>}
-            <div className="room-list">
-              {rooms.map((room) => (
-                <div key={room.id} className="room-item">
-                  <button
-                    className={
-                      room.id === activeRoomId
-                        ? "room-button active"
-                        : "room-button"
-                    }
-                    onClick={() => goRoom(room.id)}
-                  >
-                    <div>{room.name}</div>
-                    <div className="small">{room.players.join(" / ")}</div>
-                    <div className="small">
-                      最新対局日: {latestDate(room.id) ?? "なし"}
-                    </div>
-                    <div className="small">
-                      {getUmaRule(room.umaRule).label} /{" "}
-                      {getOkaRule(room.okaRule).label}
-                    </div>
-                  </button>
-                  <button
-                    className="danger room-delete"
-                    onClick={() => deleteRoom(room.id)}
-                    aria-label="ルーム削除"
-                  >
-                    ×
-                  </button>
-                </div>
-              ))}
-            </div>
-          </section>
+          <RoomForm
+            name={roomName}
+            players={roomPlayers}
+            uma={roomUma}
+            oka={roomOka}
+            tie={roomTie}
+            canSave={roomCanSave}
+            onNameChange={setRoomName}
+            onPlayersChange={setRoomPlayers}
+            onUmaChange={setRoomUma}
+            onOkaChange={setRoomOka}
+            onTieChange={setRoomTie}
+            onSave={saveRoom}
+            onClear={resetRoomForm}
+          />
+          <RoomList
+            rooms={rooms}
+            activeRoomId={activeRoomId}
+            latestDate={latestDate}
+            onSelect={goRoom}
+            onDelete={deleteRoom}
+          />
         </>
       )}
       {selectedRoom && isRoomView && (
         <>
           <div hidden={isAnalysisView}>
-          <section className="card">
-            <div className="card-title">
-              <h2>バックアップ</h2>
-            </div>
-            <div className="actions">
-              <button className="ghost" onClick={() => void exportBackup()}>
-                選択中のルームをJSONに書き出す
-              </button>
-              <button
-                className="ghost"
-                onClick={() => backupInputRef.current?.click()}
-              >
-                JSONを取り込む
-              </button>
-              <input
-                ref={backupInputRef}
-                className="visually-hidden"
-                type="file"
-                accept="application/json,.json"
-                onChange={(event) => void importBackup(event)}
-              />
-            </div>
-            {backupMessage && <p className="small">{backupMessage}</p>}
-          </section>
-          <section className="card">
-            <div className="card-title">
-              <h2>データ共有</h2>
-            </div>
-            <div className="actions">
-              <button onClick={() => void saveToServer()} disabled={isSyncing}>
-                サーバーへ保存
-              </button>
-              <button
-                className="ghost"
-                onClick={() => void loadFromServer()}
-                disabled={isSyncing}
-              >
-                サーバーから取得
-              </button>
-            </div>
-            <p className="small">
-              同期リビジョン: {syncState?.revision ?? 0}
-              。競合時は上書きせず停止します。
-            </p>
-            {syncMessage && <p className="small">{syncMessage}</p>}
-          </section>
+          <BackupPanel
+            message={backupMessage}
+            onExport={exportBackup}
+            onImport={importBackup}
+          />
+          <SyncPanel
+            revision={syncState?.revision ?? 0}
+            isSyncing={isSyncing}
+            message={syncMessage}
+            onSave={saveToServer}
+            onLoad={loadFromServer}
+          />
           <section className="card" key={selectedRoom.id}>
             <div className="card-title">
               <h2>ルーム設定</h2>
               <span className="small">入力欄から移動すると保存されます</span>
+            </div>
+            <div className="small">
+              <strong>ルール:</strong> {getUmaRule(selectedRoom.umaRule).label} /{" "}
+              {getOkaRule(selectedRoom.okaRule).label} / 同点は
+              {selectedRoom.tieRule === "seat" ? "席順" : "同着"}
             </div>
             <div className="grid">
               <label className="field">
@@ -1072,93 +829,25 @@ function App() {
               ))}
             </div>
           </section>
-          <section className="card">
-            <div className="card-title">
-              <h2>{selectedRoom.name} の対局日</h2>
-            </div>
-            <div className="actions">
-              <label className="field inline-field">
-                日付
-                <input
-                  type="date"
-                  value={newSessionDate}
-                  onChange={(event) => setNewSessionDate(event.target.value)}
-                />
-              </label>
-              <label className="field checkbox inline-field">
-                場代計算
-                <input
-                  type="checkbox"
-                  checked={newSessionFeeEnabled}
-                  onChange={(event) =>
-                    setNewSessionFeeEnabled(event.target.checked)
-                  }
-                />
-              </label>
-              {newSessionFeeEnabled && (
-                <label className="field inline-field">
-                  場代
-                  <input
-                    type="number"
-                    min="1"
-                    value={newSessionFeeAmount}
-                    onChange={(event) =>
-                      setNewSessionFeeAmount(event.target.value)
-                    }
-                  />
-                  {newSessionFeeValue === null && (
-                    <span className="alert-inline">場代を入力してください</span>
-                  )}
-                </label>
-              )}
-              <button
-                onClick={addSession}
-                disabled={newSessionFeeEnabled && newSessionFeeValue === null}
-              >
-                対局日を追加
-              </button>
-            </div>
-            <div className="session-list">
-              {sessions.map((session) => {
-                const summary = summaries.find(
-                  (item) => item.session.id === session.id,
-                );
-                return (
-                  <div
-                    key={session.id}
-                    className={
-                      session.id === activeSessionId
-                        ? "session-item active"
-                        : "session-item"
-                    }
-                  >
-                    <button
-                      onClick={() => {
-                        setSelectedSessionId(session.id);
-                        resetHandForm();
-                      }}
-                    >
-                      <strong>{session.date}</strong>
-                      <span className="small">
-                        {" "}
-                        {summary?.hands.length ?? 0} 半荘 /{" "}
-                        {session.feeEnabled
-                          ? `場代 ${session.feeAmount}`
-                          : "場代なし"}
-                      </span>
-                    </button>
-                    <button
-                      className="danger"
-                      onClick={() => deleteSession(session.id)}
-                      aria-label="対局日を削除"
-                    >
-                      ×
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
+          <SessionPanel
+            roomName={selectedRoom.name}
+            sessions={sessions}
+            summaries={summaries}
+            activeSessionId={activeSessionId}
+            newDate={newSessionDate}
+            feeEnabled={newSessionFeeEnabled}
+            feeAmount={newSessionFeeAmount}
+            feeValue={newSessionFeeValue}
+            onDateChange={setNewSessionDate}
+            onFeeEnabledChange={setNewSessionFeeEnabled}
+            onFeeAmountChange={setNewSessionFeeAmount}
+            onAdd={addSession}
+            onSelect={(sessionId) => {
+              setSelectedSessionId(sessionId);
+              resetHandForm();
+            }}
+            onDelete={deleteSession}
+          />
           {!selectedSession && (
             <section className="card">
               <p className="muted">対局日を追加すると点数を記録できます。</p>
@@ -1211,169 +900,70 @@ function App() {
                   </label>
                 )}
               </div>
-              <div className="table-wrap">
-                <table className="hand-table">
-                  <thead>
-                    <tr>
-                      <th className="col-head">#</th>
-                      {selectedRoom.players.map((player) => (
-                        <th key={player}>{player}</th>
-                      ))}
-                      <th className="col-actions">操作</th>
-                    </tr>
-                    {selectedSummary && (
-                      <tr className="summary-row">
-                        <th className="row-label">日計</th>
-                        {selectedRoom.players.map((player, index) => (
-                          <th key={player}>
-                            <div className="summary-cell">
-                              <span>
-                                {selectedSummary.totals[index].toFixed(1)}pt
-                              </span>
-                              <span className="small">
-                                順位 {selectedSummary.ranks[index]}
-                              </span>
-                            </div>
-                          </th>
-                        ))}
-                        <th />
-                      </tr>
-                    )}
-                    {selectedSummary && selectedSession.feeEnabled && (
-                      <tr className="summary-row">
-                        <th className="row-label">場代</th>
-                        {selectedRoom.players.map((player, index) => (
-                          <th key={player}>
-                            {formatAmount(selectedSummary.feeShares[index])}
-                          </th>
-                        ))}
-                        <th />
-                      </tr>
-                    )}
-                  </thead>
-                  <tbody>
-                    <tr className="input-row">
-                      <td className="row-label">
-                        {editingHandId ? "編集" : "追加"}
-                      </td>
-                      {selectedRoom.players.map((player, index) => (
-                        <td key={player}>
-                          <div className="score-input-with-suffix">
-                            <input
-                              type="text"
-                              className="score compact-input"
-                              inputMode="numeric"
-                              placeholder="250"
-                              aria-label={`${player}の点数（末尾00省略）`}
-                              value={scoreInputs[index]}
-                              onChange={(event) => {
-                                const next = [
-                                  ...scoreInputs,
-                                ] as typeof scoreInputs;
-                                next[index] = event.target.value;
-                                setScoreInputs(next);
-                              }}
-                            />
-                            <span aria-hidden="true">00</span>
-                          </div>
-                          {handPreview && (
-                            <div className="small">
-                              {handPreview.points[index].toFixed(1)}pt /{" "}
-                              {handPreview.ranks[index]}位
-                            </div>
-                          )}
-                        </td>
-                      ))}
-                      <td className="row-actions">
-                        <button
-                          onClick={saveHand}
-                          disabled={!scoreOk}
-                          aria-label="保存"
-                        >
-                          💾
-                        </button>
-                      </td>
-                    </tr>
-                    {!hands.length && (
-                      <tr>
-                        <td colSpan={6} className="muted">
-                          まだ半荘がありません。
-                        </td>
-                      </tr>
-                    )}
-                    {hands.map((hand, index) => {
-                      const result = computeHandPoints(
-                        selectedRoom,
-                        hand.scores,
-                        hand.tieBreakOrders,
-                      );
-                      return (
-                        <tr key={hand.id}>
-                          <td className="row-label">{index + 1}</td>
-                          {selectedRoom.players.map((player, playerIndex) => (
-                            <td key={player}>
-                              <div>{hand.scores[playerIndex]}</div>
-                              <div className="small">
-                                {result.points[playerIndex].toFixed(1)}pt /{" "}
-                                {result.ranks[playerIndex]}位
-                              </div>
-                            </td>
-                          ))}
-                          <td className="row-actions">
-                            <button
-                              onClick={() => editHand(hand)}
-                              aria-label="編集"
-                            >
-                              ✎
-                            </button>
-                            <button
-                              className="danger"
-                              onClick={() => deleteHand(hand.id)}
-                              aria-label="削除"
-                            >
-                              ×
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+              <HandTable
+                room={selectedRoom}
+                summary={selectedSummary}
+                feeEnabled={selectedSession.feeEnabled}
+                hands={hands}
+                editingHandId={editingHandId}
+                scoreInputs={scoreInputs}
+                scoreOk={scoreOk}
+                handPreview={handPreview ?? undefined}
+                onScoreInputsChange={setScoreInputs}
+                onSave={saveHand}
+                onEdit={editHand}
+                onDelete={deleteHand}
+                formatAmount={formatAmount}
+              />
               {selectedRoom.tieRule === "seat" && tieGroups.length > 0 && (
                 <div className="tie-break">
                   <strong>同点時の上位順</strong>
-                  {tieGroups.map((group) => (
+                  <p className="small">
+                    各同点グループで上位順を確定してから保存してください。
+                  </p>
+                  {tieBreakMessage && (
+                    <p className="alert-inline">{tieBreakMessage}</p>
+                  )}
+                  {tieGroups.map((group) => {
+                    const rankStart =
+                      (parsedScores as number[]).filter(
+                        (score) => score > group.score,
+                      ).length + 1;
+                    return (
                     <div key={group.score} className="tie-group">
                       <span>{group.score}点:</span>
-                      {resolveTieOrder(group, tieBreakOrders).map(
-                        (playerIndex, position) => (
+                      {group.playerIndexes.map((playerIndex) => {
+                        const selection = tieRankSelections.find(
+                          (item) => item.score === group.score,
+                        );
+                        return (
                           <span key={playerIndex} className="tie-player">
-                            {handPreview?.ranks[playerIndex] ?? position + 1}位{" "}
                             {selectedRoom.players[playerIndex]}
-                            <button
-                              onClick={() =>
-                                moveTiePlayer(group, playerIndex, -1)
-                              }
-                              disabled={position === 0}
-                            >
-                              ↑
-                            </button>
-                            <button
-                              onClick={() =>
-                                moveTiePlayer(group, playerIndex, 1)
-                              }
-                              disabled={
-                                position === group.playerIndexes.length - 1
+                            <select
+                              aria-label={`${selectedRoom.players[playerIndex]}の順位`}
+                              value={selection?.playerRanks[playerIndex] ?? ""}
+                              onChange={(event) =>
+                                selectTieRank(
+                                  group,
+                                  rankStart,
+                                  playerIndex,
+                                  Number(event.target.value),
+                                )
                               }
                             >
-                              ↓
-                            </button>
+                              <option value="">順位を選択</option>
+                              {group.playerIndexes.map((_, index) => (
+                                <option key={index} value={rankStart + index}>
+                                  {rankStart + index}位
+                                </option>
+                              ))}
+                            </select>
                           </span>
-                        ),
-                      )}
+                        );
+                      })}
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </section>
@@ -1385,9 +975,56 @@ function App() {
           <div hidden={!isAnalysisView}>
           <section className="card">
             <div className="card-title">
+              <h2>分析対象の対局日</h2>
+              <button
+                className="ghost"
+                onClick={() => {
+                  setAnalysisStartSessionId("");
+                  setAnalysisEndSessionId("");
+                }}
+              >
+                全対局日
+              </button>
+            </div>
+            <div className="actions">
+              <label className="field inline-field">
+                開始日
+                <select
+                  value={analysisStartSessionId}
+                  onChange={(event) => setAnalysisStartSessionId(event.target.value)}
+                >
+                  <option value="">指定なし</option>
+                  {sessions.map((session) => (
+                    <option key={session.id} value={session.id}>{session.date}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="field inline-field">
+                終了日
+                <select
+                  value={analysisEndSessionId}
+                  onChange={(event) => setAnalysisEndSessionId(event.target.value)}
+                >
+                  <option value="">指定なし</option>
+                  {sessions.map((session) => (
+                    <option key={session.id} value={session.id}>{session.date}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            {hasInvalidAnalysisRange ? (
+              <p className="alert-inline">開始日は終了日以前を選択してください。</p>
+            ) : (
+              <p className="small">
+                {analysisStartDate ?? "最初"} から {analysisEndDate ?? "最後"} までの成績を表示しています。
+              </p>
+            )}
+          </section>
+          <section className="card">
+            <div className="card-title">
               <h2>通算成績</h2>
               <div className="compact-meta">
-                <span className="small">全対局日を合算</span>
+                <span className="small">指定した対局日を合算</span>
                 {hasSessionFees && (
                   <label className="field checkbox inline-field">
                     総場代を表示
