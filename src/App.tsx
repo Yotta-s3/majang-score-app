@@ -26,6 +26,7 @@ import { createSessionSummary } from "./domain/analytics";
 import { BackupPanel } from "./components/BackupPanel";
 import { RoomList } from "./components/RoomList";
 import { RoomForm } from "./components/RoomForm";
+import { RoomAddPanel } from "./components/RoomAddPanel";
 import { SessionPanel } from "./components/SessionPanel";
 import { HandTable } from "./components/HandTable";
 import { SyncPanel } from "./components/SyncPanel";
@@ -183,6 +184,7 @@ function App() {
   const [roomUma, setRoomUma] = useState<UmaRuleId>("10-20");
   const [roomOka, setRoomOka] = useState<OkaRuleId>("oka20");
   const [roomTie, setRoomTie] = useState<TieRuleId>("split");
+  const [isRoomCreateOpen, setIsRoomCreateOpen] = useState(false);
   const [newSessionDate, setNewSessionDate] = useState(todayString);
   const [newSessionFeeEnabled, setNewSessionFeeEnabled] = useState(false);
   const [newSessionFeeAmount, setNewSessionFeeAmount] = useState("");
@@ -210,6 +212,14 @@ function App() {
     window.addEventListener("hashchange", onHashChange);
     return () => window.removeEventListener("hashchange", onHashChange);
   }, []);
+  useEffect(() => {
+    if (!isRoomCreateOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIsRoomCreateOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isRoomCreateOpen]);
 
   const rooms = useLiveQuery(
     () => db.rooms.orderBy("createdAt").reverse().toArray(),
@@ -389,6 +399,8 @@ function App() {
     await db.rooms.add(room);
     setSelectedRoomId(room.id);
     resetRoomForm();
+    setIsRoomCreateOpen(false);
+    window.location.hash = `/room/${encodeURIComponent(room.id)}`;
   };
   const addSession = async () => {
     if (
@@ -730,6 +742,9 @@ function App() {
         <div>
           <p className="eyebrow">Mahjong Score</p>
           <h1>麻雀点数記録アプリ</h1>
+          {selectedRoom && !isHomeView && (
+            <p className="room-context">ルーム: {selectedRoom.name}</p>
+          )}
         </div>
         {!isHomeView && (
           <div className="actions">
@@ -749,20 +764,10 @@ function App() {
       </header>
       {isHomeView && (
         <>
-          <RoomForm
-            name={roomName}
-            players={roomPlayers}
-            uma={roomUma}
-            oka={roomOka}
-            tie={roomTie}
-            canSave={roomCanSave}
-            onNameChange={setRoomName}
-            onPlayersChange={setRoomPlayers}
-            onUmaChange={setRoomUma}
-            onOkaChange={setRoomOka}
-            onTieChange={setRoomTie}
-            onSave={saveRoom}
-            onClear={resetRoomForm}
+          <RoomAddPanel
+            message={backupMessage}
+            onCreate={() => setIsRoomCreateOpen(true)}
+            onImport={importBackup}
           />
           <RoomList
             rooms={rooms}
@@ -773,13 +778,43 @@ function App() {
           />
         </>
       )}
+      {isRoomCreateOpen && (
+        <div
+          className="modal-backdrop"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setIsRoomCreateOpen(false);
+          }}
+        >
+          <div className="modal" role="dialog" aria-modal="true" aria-labelledby="room-create-title">
+            <div className="modal-title">
+              <h2 id="room-create-title">ルーム作成</h2>
+              <button className="ghost" onClick={() => setIsRoomCreateOpen(false)} aria-label="閉じる">×</button>
+            </div>
+            <RoomForm
+              name={roomName}
+              players={roomPlayers}
+              uma={roomUma}
+              oka={roomOka}
+              tie={roomTie}
+              canSave={roomCanSave}
+              onNameChange={setRoomName}
+              onPlayersChange={setRoomPlayers}
+              onUmaChange={setRoomUma}
+              onOkaChange={setRoomOka}
+              onTieChange={setRoomTie}
+              onSave={saveRoom}
+              onClear={resetRoomForm}
+            />
+          </div>
+        </div>
+      )}
       {selectedRoom && isRoomView && (
         <>
           <div hidden={isAnalysisView}>
           <BackupPanel
             message={backupMessage}
             onExport={exportBackup}
-            onImport={importBackup}
           />
           <SyncPanel
             revision={syncState?.revision ?? 0}

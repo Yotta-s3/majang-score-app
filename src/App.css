@@ -4,6 +4,39 @@
   padding: 16px;
 }
 
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(15, 42, 28, 0.45);
+}
+
+.modal {
+  width: min(100%, 680px);
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  border-radius: 16px;
+  background: #fffdf6;
+}
+
+.modal-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 12px 0;
+}
+
+.modal-title h2 { margin: 0; }
+
+.modal .card {
+  margin: 0;
+  border: 0;
+  box-shadow: none;
+}
+
 .header {
   display: grid;
   gap: 6px;
@@ -21,6 +54,12 @@
 .subtitle {
   margin: 0;
   color: #2b3a33;
+}
+
+.room-context {
+  margin: 4px 0 0;
+  color: #2e5f46;
+  font-weight: 600;
 }
 
 .card {
