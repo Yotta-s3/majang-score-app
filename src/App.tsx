@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
+import { useRegisterSW } from "virtual:pwa-register/react";
 import {
   db,
   type HandRecord,
@@ -175,6 +176,10 @@ const PointTrendChart = ({
   );
 };
 function App() {
+  const {
+    needRefresh: [needRefresh],
+    updateServiceWorker,
+  } = useRegisterSW();
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(
     null,
@@ -1262,6 +1267,12 @@ function App() {
           </section>
           </div>
         </>
+      )}
+      {needRefresh && (
+        <aside className="update-notice" role="status">
+          <span>新しいバージョンを利用できます。</span>
+          <button onClick={() => void updateServiceWorker(true)}>更新する</button>
+        </aside>
       )}
     </div>
   );

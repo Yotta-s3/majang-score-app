@@ -625,6 +625,35 @@ input {
   font-weight: 600;
 }
 
+.update-notice {
+  position: fixed;
+  z-index: 20;
+  right: 16px;
+  bottom: 16px;
+  left: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #173f2a;
+  box-shadow: 0 8px 24px rgba(15, 42, 28, 0.3);
+  color: #fffdf6;
+}
+
+.update-notice button {
+  flex: none;
+  border: 0;
+  border-radius: 8px;
+  padding: 8px 12px;
+  background: #fffdf6;
+  color: #173f2a;
+  font-weight: 700;
+}
+
 @media (max-width: 600px) {
   .page {
     padding: 12px;
