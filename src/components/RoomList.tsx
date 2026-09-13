@@ -3,18 +3,22 @@ import { getOkaRule, getUmaRule } from '../domain/scoring'
 
 type RoomListProps = {
   rooms: Room[]
+  isLoading: boolean
+  error: string | null
   activeRoomId: string | null
   latestDate: (roomId: string) => string | undefined
   onSelect: (roomId: string) => void
   onDelete: (roomId: string) => void
 }
 
-export const RoomList = ({ rooms, activeRoomId, latestDate, onSelect, onDelete }: RoomListProps) => (
+export const RoomList = ({ rooms, isLoading, error, activeRoomId, latestDate, onSelect, onDelete }: RoomListProps) => (
   <section className="card">
     <div className="card-title">
       <h2>ルーム一覧</h2>
     </div>
-    {!rooms.length && <p className="muted">まだルームがありません。</p>}
+    {isLoading && <p className="muted" role="status">ルームを読み込んでいます…</p>}
+    {error && <p className="error-message" role="alert">ルームを読み込めませんでした。再読み込みしてください。</p>}
+    {!isLoading && !error && !rooms.length && <p className="muted">まだルームがありません。</p>}
     <div className="room-list">
       {rooms.map((room) => (
         <div key={room.id} className="room-item">

@@ -225,11 +225,22 @@ function App() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [isRoomCreateOpen]);
 
-  const rooms = useLiveQuery(
-    () => db.rooms.orderBy("createdAt").reverse().toArray(),
+  const roomQuery = useLiveQuery(
+    () =>
+      db.rooms
+        .orderBy("createdAt")
+        .reverse()
+        .toArray()
+        .then((items) => ({ rooms: items, error: null }))
+        .catch((error: unknown) => ({
+          rooms: [],
+          error: error instanceof Error ? error.message : "ルームを読み込めませんでした。",
+        })),
     [],
-    [] as Room[],
   );
+  const rooms = roomQuery?.rooms ?? [];
+  const isRoomsLoading = roomQuery === undefined;
+  const roomsLoadError = roomQuery?.error ?? null;
   const route = hash.match(/^#\/room\/([^/]+)(\/analysis)?$/);
   const routeRoomId = route?.[1] ? decodeURIComponent(route[1]) : null;
   const activeRoomId = routeRoomId ?? selectedRoomId ?? rooms[0]?.id ?? null;
@@ -806,6 +817,8 @@ function App() {
           />
           <RoomList
             rooms={rooms}
+            isLoading={isRoomsLoading}
+            error={roomsLoadError}
             activeRoomId={activeRoomId}
             latestDate={latestDate}
             onSelect={goRoom}
