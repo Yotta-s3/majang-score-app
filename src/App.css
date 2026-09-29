@@ -482,7 +482,7 @@ input {
   font-size: 12px;
 }
 
-.analysis-content {
+.analysis-content:not([hidden]) {
   display: flex;
   flex-direction: column;
 }

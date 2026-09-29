@@ -328,6 +328,9 @@ function App() {
   const isHomeView = !route;
   const isRoomView = Boolean(route);
   const isAnalysisView = Boolean(route?.[2]);
+  useEffect(() => {
+    if (isAnalysisView) window.scrollTo({ top: 0, behavior: "auto" });
+  }, [isAnalysisView]);
   const allSessions = useLiveQuery(
     () => db.sessions.toArray(),
     [],
