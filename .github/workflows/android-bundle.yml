@@ -21,10 +21,15 @@ jobs:
           cache: gradle
 
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
+        with:
+          accept-android-sdk-licenses: false
+          packages: ''
 
-      - name: Install Android platform
-        run: sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+      - name: Accept SDK licenses and install Android platform
+        run: |
+          yes | sdkmanager --licenses
+          sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
 
       - name: Restore upload key
         env:
