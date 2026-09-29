@@ -5,7 +5,9 @@
       "namespace": "android_app",
       "package_name": "io.github.yottas3.mahjongscoreapp",
       "sha256_cert_fingerprints": [
-        "AF:EA:8C:7A:01:67:74:59:1D:4D:7D:33:0E:14:15:C5:A3:F4:96:8F:71:EB:43:9E:3C:2E:01:F8:A2:A0:48:E6"
+        "FA:E3:73:38:48:28:C7:2E:DC:F6:F6:EF:3D:D7:38:FA:79:DA:7A:73:26:CC:75:B7:14:D7:23:CC:B0:06:6F:D2",
+        "66:7F:68:F1:04:59:35:26:F1:EE:86:65:2D:7D:C7:DC:A0:61:42:F0:6C:3F:FD:61:AD:B0:7D:AE:DD:01:D6:D4",
+        "54:9F:E5:3B:B1:B2:86:4D:DD:6E:68:27:DF:DB:8C:F3:A7:74:A5:A9:48:1C:BE:E3:53:F2:F3:74:19:5A:64:01"
       ]
     }
   }

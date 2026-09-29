@@ -74,6 +74,6 @@ Androidプロジェクトは Bubblewrap が生成したTWAプロジェクトで�
 
 ## 更新時の注意
 
-- `assetlinks.json` の証明書フィンガープリントは、配布中アプリの署名鍵を変えない限り変更しない。
+- `assetlinks.json` には、Play アプリ署名の管理でダウンロードできる `deployment_cert`、`hybrid_classical_cert`、`hybrid_pqc_cert` のSHA-256をすべて登録する。
 - 署名鍵を変更した場合は、既存アプリの更新として公開できない可能性があるため、変更前にGoogle Play App Signingの設定を確認する。
 - サーバーURL、パッケージID、署名鍵を変える変更は、内部テストで関連付けと起動を必ず確認する。
