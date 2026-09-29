@@ -89,12 +89,19 @@ const PointTrendChart = ({
       : 18 + ((max - value) / range) * 218;
   const valueLabel = (value: number) =>
     isRankChart ? `${value.toFixed(2)}位` : `${value.toFixed(1)}pt`;
+  const chartWidth = Math.max(640, 72 + Math.max(0, series.length - 1) * 64);
+  const chartStartX = 52;
+  const chartEndX = chartWidth - 20;
+  const pointX = (index: number) =>
+    series.length === 1
+      ? chartWidth / 2
+      : chartStartX + (index / (series.length - 1)) * (chartEndX - chartStartX);
   const colors = ["#0f5132", "#b54708", "#2764a8", "#8a3fa0"];
   const [hoveredPoint, setHoveredPoint] = useState<ChartPoint | null>(null);
   const [selectedPoint, setSelectedPoint] = useState<ChartPoint | null>(null);
   const tooltipPoint = hoveredPoint ?? selectedPoint;
   const tooltipX = tooltipPoint
-    ? Math.min(Math.max(58, tooltipPoint.x - 70), 480)
+    ? Math.min(Math.max(58, tooltipPoint.x - 70), chartWidth - 160)
     : 0;
   const tooltipY = tooltipPoint
     ? tooltipPoint.y < 70
@@ -123,17 +130,18 @@ const PointTrendChart = ({
       <div className="chart-wrap">
         <svg
           className="revenue-chart"
-          viewBox="0 0 640 280"
+          viewBox={`0 0 ${chartWidth} 280`}
+          style={{ width: `max(100%, ${chartWidth}px)` }}
           role="img"
           aria-label={label}
         >
-          <line x1="52" y1="18" x2="52" y2="236" className="chart-axis" />
-          <line x1="52" y1="236" x2="620" y2="236" className="chart-axis" />
+          <line x1={chartStartX} y1="18" x2={chartStartX} y2="236" className="chart-axis" />
+          <line x1={chartStartX} y1="236" x2={chartEndX} y2="236" className="chart-axis" />
           {!isRankChart && (
             <line
-              x1="52"
+              x1={chartStartX}
               y1={18 + (max / range) * 218}
-              x2="620"
+              x2={chartEndX}
               y2={18 + (max / range) * 218}
               className="chart-zero"
             />
@@ -158,7 +166,7 @@ const PointTrendChart = ({
             const points = series
               .map(
                 (item, index) =>
-                  `${series.length === 1 ? 336 : 52 + (index / (series.length - 1)) * 568},${pointY(item.totals[playerIndex])}`,
+                  `${pointX(index)},${pointY(item.totals[playerIndex])}`,
               )
               .join(" ");
             return (
@@ -180,10 +188,7 @@ const PointTrendChart = ({
                   strokeLinecap="round"
                 />
                 {series.map((item, index) => {
-                  const x =
-                    series.length === 1
-                      ? 336
-                      : 52 + (index / (series.length - 1)) * 568;
+                  const x = pointX(index);
                   const y = pointY(item.totals[playerIndex]);
                   const chartPoint = {
                     date: item.label ?? item.date,
@@ -222,11 +227,11 @@ const PointTrendChart = ({
               </g>
             );
           })}
-          <text x="52" y="264" className="chart-label">
+          <text x={chartStartX} y="264" className="chart-label">
             {series[0].date}
           </text>
           {series.length > 1 && (
-            <text x="620" y="264" textAnchor="end" className="chart-label">
+            <text x={chartEndX} y="264" textAnchor="end" className="chart-label">
               {series[series.length - 1].date}
             </text>
           )}
