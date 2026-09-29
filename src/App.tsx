@@ -13,7 +13,7 @@ import {
   type UmaRuleId,
 } from "./db";
 import { BACKUP_FORMAT_VERSION, parseBackup, type BackupData } from "./backup";
-import { getRemoteRoom, getRemoteRoomByShareCode, saveRemoteRoom, type RoomSyncPayload } from "./sync";
+import { syncService, type RoomSyncPayload } from "./services/syncService";
 import {
   computeHandPoints,
   getTieGroups,
@@ -660,7 +660,7 @@ function App() {
         sessions,
         hands: roomHands,
       };
-      const result = await saveRemoteRoom(
+      const result = await syncService.saveRoom(
         selectedRoom.id,
         syncState?.revision ?? 0,
         payload,
@@ -694,7 +694,7 @@ function App() {
     setIsSyncing(true);
     setSyncMessage("サーバーから取得しています…");
     try {
-      const result = await getRemoteRoom(selectedRoom.id);
+      const result = await syncService.getRoom(selectedRoom.id);
       if (!result.ok) throw new Error(result.error ?? "不明なエラー");
       if (!result.payload) {
         setSyncMessage(
@@ -731,7 +731,7 @@ function App() {
     if (!shareCode) { setJoinMessage("共有コードを入力してください。"); return; }
     setJoinMessage("ルームを取得しています…");
     try {
-      const result = await getRemoteRoomByShareCode(shareCode);
+      const result = await syncService.getRoomByShareCode(shareCode);
       if (!result.ok || !result.payload || !result.roomId) throw new Error(result.error ?? "ルームを取得できませんでした。");
       await mergeRemotePayload({ ...result.payload, room: { ...result.payload.room, shareCode: result.shareCode ?? shareCode } });
       await db.syncStates.put({ roomId: result.roomId, revision: result.revision ?? 0, updatedAt: result.updatedAt ?? Date.now(), syncedAt: Date.now() });
