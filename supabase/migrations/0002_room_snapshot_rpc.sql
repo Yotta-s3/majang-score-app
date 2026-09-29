@@ -11,8 +11,6 @@ returns table (room_id uuid, share_code text, revision bigint, updated_at bigint
 language plpgsql
 security definer
 set search_path = public
-set lock_timeout = '10s'
-set statement_timeout = '20s'
 as $$
 declare
   target_room public.rooms%rowtype;
@@ -28,8 +26,7 @@ begin
   for update;
 
   if not found then
-    -- GAS同期済みの既存ルームはローカルにリビジョンを持つが、
-    -- Supabase側に未登録なら初回移行として作成する。
+    -- サーバー側に未登録なら、ローカルルームの初回保存として作成する。
     insert into public.rooms (
       id, owner_id, name, players, uma_rule, oka_rule, tie_rule, fee_enabled, fee_amount
     )

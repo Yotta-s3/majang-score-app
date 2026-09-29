@@ -1,73 +1,46 @@
-# React + TypeScript + Vite
+# Mahjong Score App
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+4人麻雀のスコアを記録・集計し、共有コードで複数端末から同じルームを利用できるPWAです。
 
-Currently, two official plugins are available:
+## 主な機能
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- Room / 対局日 / 半荘の記録と成績集計
+- ウマ・オカ・同点時の席順ルール
+- JSONバックアップと復元
+- 共有コードによるルーム参加
+- IndexedDBによる端末内保存とSupabaseへの手動同期
+- オフライン時の閲覧・入力と、PWAとしてのホーム画面追加
 
-## React Compiler
+## 技術構成
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- React / TypeScript / Vite
+- Dexie（IndexedDB）
+- Supabase（PostgreSQL、Anonymous Auth、RLS）
+- GitHub Pages / GitHub Actions
 
-## Expanding the ESLint configuration
+Google OAuth、Google Apps Script、Google Sheetsには依存しません。
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## 開発を始める
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```powershell
+npm install
+Copy-Item .env.example .env.local
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+`.env.local`にはSupabase DashboardのProject URLとPublishable keyを設定します。`service_role` keyは使用しません。
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+```env
+VITE_SUPABASE_URL=https://<project-ref>.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=<publishable-key>
+```
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+DB初期設定とGitHub Pagesへの公開設定は[Supabase運用手順](supabase/README.md)を参照してください。
+
+## 品質確認
+
+```powershell
+npm run lint
+npm run test:run
+npm run build
 ```

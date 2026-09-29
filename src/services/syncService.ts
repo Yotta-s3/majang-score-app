@@ -1,7 +1,5 @@
 import type { HandRecord, Room, Session } from '../db'
-import { gasSyncService } from '../sync'
 import { supabaseSyncService } from './supabaseSyncService'
-import { isSupabaseConfigured } from './supabaseClient'
 
 export type RoomSyncPayload = {
   room: Room
@@ -26,5 +24,4 @@ export type SyncService = {
   saveRoom: (roomId: string, baseRevision: number, payload: RoomSyncPayload) => Promise<SyncResult>
 }
 
-// 接続情報を設定した環境だけSupabaseを使う。未設定の公開版は移行完了までGASを使い続ける。
-export const syncService: SyncService = isSupabaseConfigured ? supabaseSyncService : gasSyncService
+export const syncService: SyncService = supabaseSyncService

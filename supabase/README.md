@@ -1,30 +1,42 @@
-# Supabase移行準備
+# Supabase運用手順
 
-このフォルダは、GAS同期からSupabaseへ移行する際に使うDB定義です。まだアプリはSupabaseへ接続しません。
+このアプリはSupabaseを唯一の共有バックエンドとして利用します。端末内のIndexedDBは、オフライン利用と表示を支えるローカルデータストアです。
 
-## 方針
+## 構成
 
-- 利用者はGoogleログインを行わず、Supabase Anonymous Authで内部的に認証する。
-- Roomを新規作成した匿名ユーザーは、自動的にownerとして`room_members`へ追加される。
-- 共有コード入力は`join_room_by_share_code` RPCで処理し、参加後だけRoomのデータを読める。
-- RLSにより、Roomのメンバー以外はRoom・Session・Handを読み書きできない。
+- Supabase Anonymous Authで端末ごとに内部認証する。Googleログインは不要。
+- ルーム作成者は`room_members`のownerになる。
+- 共有コードで参加した利用者だけが、そのルームをRLS経由で読み書きできる。
+- 保存時は`revision`を照合し、別端末で更新された内容を黙って上書きしない。
 
-## 適用するタイミング
+## 新規プロジェクトの設定
 
-Supabaseプロジェクトを作成した後、CLIで初期化して`migrations`配下のSQLをファイル名順に適用する。DashboardのSQL Editorで直接実行する場合も、各ファイル全体を順番に実行する。
+1. Supabaseプロジェクトを作成する。
+2. **Enable Data API** と **Enable automatic RLS** をオン、**Automatically expose new tables** をオフにする。
+3. Authentication → ProvidersでAnonymous Sign-Insを有効にする。
+4. SQL Editorで、次のファイルを順番に全内容実行する。
+   - `migrations/0001_initial_schema.sql`
+   - `migrations/0002_room_snapshot_rpc.sql`
+5. `.env.example`を`.env.local`へ複製し、Project Settings → APIの値を設定する。
 
-アプリ接続を始める前に、Supabase DashboardでAnonymous Sign-Insを有効にする。
-
-## プロジェクト作成後の設定
-
-1. Supabase Dashboardで新しいプロジェクトを作成する。
-2. AuthenticationのProvidersからAnonymous Sign-Insを有効にする。
-3. SQL Editorで`migrations/0001_initial_schema.sql`、続けて`migrations/0002_room_snapshot_rpc.sql`の全内容を順番に実行する。
-4. `.env.example`を複製して`.env.local`を作成し、Project Settings > APIの値を設定する。
-
-```text
+```env
 VITE_SUPABASE_URL=https://<project-ref>.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=<publishable-key>
 ```
 
-`VITE_`で始まる値はブラウザへ配布されるため、service_role keyは絶対に設定しない。`.env.local`はGitの管理対象外。
+`service_role` keyはブラウザ・GitHub Secrets・リポジトリのいずれにも設定しません。
+
+## GitHub Pages
+
+Repository secretsとして以下を登録します。
+
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_PUBLISHABLE_KEY`
+
+`main`へのpush時、GitHub Actionsがこれらをビルド時の環境変数として利用します。Publishable keyはブラウザへ配布される前提のキーであり、アクセス制御はRLSポリシーが担います。
+
+## 日常の運用
+
+- 端末を変更した場合は、共有コードでルームに参加する。
+- 保存競合が表示された場合は、先に「サーバーから取得」で内容を確認してから保存する。
+- 共有コードを失うと新しい端末からの参加が難しくなるため、必要に応じてJSONバックアップも保管する。

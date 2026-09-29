@@ -86,16 +86,11 @@ const toPayload = (remote: RemoteRoom): RoomSyncPayload => {
   }
 }
 
-const errorResult = (error: { message: string; code?: string }): SyncResult => {
-  if (error.code === '55P03') {
-    return { ok: false, error: '別の保存処理を待機中です。少し待ってから再試行してください。' }
-  }
-  return {
-    ok: false,
-    code: error.code === 'P0001' && error.message === 'room conflict' ? 'conflict' : undefined,
-    error: error.message,
-  }
-}
+const errorResult = (error: { message: string; code?: string }): SyncResult => ({
+  ok: false,
+  code: error.code === 'P0001' && error.message === 'room conflict' ? 'conflict' : undefined,
+  error: error.message,
+})
 
 const connectionError = (error: unknown) => {
   if (error instanceof Error && error.name === 'AbortError') {
