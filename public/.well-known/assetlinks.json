@@ -3,7 +3,7 @@
     "relation": ["delegate_permission/common.handle_all_urls"],
     "target": {
       "namespace": "android_app",
-      "package_name": "io.github.yottas3.mahjongscore",
+      "package_name": "io.github.yottas3.mahjongscoreapp",
       "sha256_cert_fingerprints": [
         "AF:EA:8C:7A:01:67:74:59:1D:4D:7D:33:0E:14:15:C5:A3:F4:96:8F:71:EB:43:9E:3C:2E:01:F8:A2:A0:48:E6"
       ]

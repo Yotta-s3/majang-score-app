@@ -25,21 +25,16 @@ dist-ssr
 
 # Bubblewrap / Android
 android.keystore
+android-upload.keystore
+*.keystore
+*.jks
+local.properties
 app-release-bundle.aab
 app-release.aab
 intermediary-bundle.aab
 *.aab
-app/
-gradle/
-gradlew
-gradlew.bat
-build.gradle
-settings.gradle
-gradle.properties
-manifest-checksum.txt
-store_icon.png
-twa-manifest.json
 .gradle/
 build/
+app/build/
 *.apk
 *.idsig
