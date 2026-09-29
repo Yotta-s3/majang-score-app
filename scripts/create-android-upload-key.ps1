@@ -11,6 +11,7 @@ if (Test-Path $resolvedPath) {
 & keytool -genkeypair `
   -v `
   -keystore $resolvedPath `
+  -storetype PKCS12 `
   -alias upload `
   -keyalg RSA `
   -keysize 4096 `

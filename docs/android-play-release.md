@@ -41,7 +41,7 @@ PowerShellで次を実行する。コマンド中で表示されるパスワー�
 | `ANDROID_UPLOAD_KEYSTORE_BASE64` | `android-upload.keystore` をBase64化した文字列 |
 | `ANDROID_UPLOAD_KEYSTORE_PASSWORD` | 鍵ストア作成時のパスワード |
 | `ANDROID_UPLOAD_KEY_ALIAS` | `upload` |
-| `ANDROID_UPLOAD_KEY_PASSWORD` | 鍵作成時の鍵パスワード |
+| `ANDROID_UPLOAD_KEY_PASSWORD` | `ANDROID_UPLOAD_KEYSTORE_PASSWORD` と同じ値（作成するPKCS12鍵ストアでは鍵パスワードを分けない） |
 
 Base64文字列はPowerShellで生成できる。
 
