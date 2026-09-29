@@ -53,7 +53,7 @@ GitHubで **Actions → Build Android bundle → Run workflow** を実行する�
 
 ## ローカルでのAAB作成
 
-Androidプロジェクトは Bubblewrap が生成したTWAプロジェクトである。ローカルビルドにはAndroid SDKと、上記4つの `ANDROID_KEY...` 環境変数が必要。バージョンを更新する場合は、`app/build.gradle` の `versionCode` を必ず前回より大きい値にし、`versionName` も更新する。
+Androidプロジェクトは Bubblewrap が生成したTWAプロジェクトである。ローカルビルドにはAndroid SDKと、上記4つの `ANDROID_KEY...` 環境変数が必要。Google Playの要件に合わせ、`compileSdkVersion` と `targetSdkVersion` は36にしている。バージョンを更新する場合は、`app/build.gradle` の `versionCode` を必ず前回より大きい値にし、`versionName` も更新する。
 
 ```powershell
 ./gradlew.bat bundleRelease
