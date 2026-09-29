@@ -2,8 +2,19 @@ import { createClient } from '@supabase/supabase-js'
 
 const url = import.meta.env.VITE_SUPABASE_URL
 const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
+const requestTimeoutMs = 30_000
 
 export const isSupabaseConfigured = Boolean(url && key)
+
+const fetchWithTimeout: typeof fetch = async (input, init) => {
+  const controller = new AbortController()
+  const timeout = globalThis.setTimeout(() => controller.abort(), requestTimeoutMs)
+  try {
+    return await fetch(input, { ...init, signal: controller.signal })
+  } finally {
+    globalThis.clearTimeout(timeout)
+  }
+}
 
 export const supabase = isSupabaseConfigured
   ? createClient(url, key, {
@@ -12,6 +23,7 @@ export const supabase = isSupabaseConfigured
         autoRefreshToken: true,
         detectSessionInUrl: false,
       },
+      global: { fetch: fetchWithTimeout },
     })
   : null
 

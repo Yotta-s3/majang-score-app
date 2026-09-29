@@ -86,11 +86,23 @@ const toPayload = (remote: RemoteRoom): RoomSyncPayload => {
   }
 }
 
-const errorResult = (error: { message: string; code?: string }): SyncResult => ({
-  ok: false,
-  code: error.code === '40001' ? 'conflict' : undefined,
-  error: error.message,
-})
+const errorResult = (error: { message: string; code?: string }): SyncResult => {
+  if (error.code === '55P03') {
+    return { ok: false, error: '別の保存処理を待機中です。少し待ってから再試行してください。' }
+  }
+  return {
+    ok: false,
+    code: error.code === 'P0001' && error.message === 'room conflict' ? 'conflict' : undefined,
+    error: error.message,
+  }
+}
+
+const connectionError = (error: unknown) => {
+  if (error instanceof Error && error.name === 'AbortError') {
+    return 'サーバーからの応答がタイムアウトしました。通信状況を確認して再試行してください。'
+  }
+  return error instanceof Error ? error.message : 'サーバーへ接続できませんでした。'
+}
 
 const getRoom = async (roomId: string): Promise<SyncResult> => {
   try {
@@ -114,7 +126,7 @@ const getRoom = async (roomId: string): Promise<SyncResult> => {
       payload: toPayload(remote),
     }
   } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : 'サーバーへ接続できませんでした。' }
+    return { ok: false, error: connectionError(error) }
   }
 }
 
@@ -131,7 +143,7 @@ export const supabaseSyncService: SyncService = {
       if (!data) return { ok: false, error: '共有コードに一致するルームが見つかりません。' }
       return getRoom(String(data))
     } catch (error) {
-      return { ok: false, error: error instanceof Error ? error.message : 'サーバーへ接続できませんでした。' }
+      return { ok: false, error: connectionError(error) }
     }
   },
   saveRoom: async (roomId, baseRevision, payload) => {
@@ -161,7 +173,7 @@ export const supabaseSyncService: SyncService = {
         updatedAt: Number(saved.updated_at),
       }
     } catch (error) {
-      return { ok: false, error: error instanceof Error ? error.message : 'サーバーへ接続できませんでした。' }
+      return { ok: false, error: connectionError(error) }
     }
   },
 }
