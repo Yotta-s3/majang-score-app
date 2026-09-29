@@ -25,7 +25,7 @@ export const HandTable = ({
   <div className="table-wrap">
     <table className="hand-table">
       <thead>
-        <tr><th className="col-head">#</th>{room.players.map((player) => <th key={player}>{player}</th>)}<th className="col-actions">操作</th></tr>
+        <tr><th className="col-head">#</th>{room.players.map((player) => <th key={player}>{player}</th>)}<th className="col-actions"></th></tr>
         {summary && <tr className="summary-row"><th className="row-label">日計</th>{room.players.map((player, index) => <th key={player}><div className="summary-cell"><span>{summary.totals[index].toFixed(1)}pt</span><span className="small">順位 {summary.ranks[index]}</span></div></th>)}<th /></tr>}
         {summary && feeEnabled && <tr className="summary-row"><th className="row-label">場代</th>{room.players.map((player, index) => <th key={player}>{formatAmount(summary.feeShares[index])}</th>)}<th /></tr>}
       </thead>

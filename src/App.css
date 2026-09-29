@@ -461,6 +461,52 @@ input {
   font-size: 12px;
 }
 
+.chart-point {
+  cursor: pointer;
+  stroke: #fff;
+  stroke-width: 2;
+}
+
+.chart-point:focus {
+  outline: none;
+  stroke: #173d2a;
+  stroke-width: 4;
+}
+
+.chart-tooltip rect {
+  fill: rgba(24, 48, 35, 0.92);
+}
+
+.chart-tooltip text {
+  fill: #fff;
+  font-size: 12px;
+}
+
+.analysis-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.analysis-stats {
+  order: 1;
+}
+
+.analysis-rank-distribution {
+  order: 2;
+}
+
+.analysis-rank-trend {
+  order: 3;
+}
+
+.analysis-daily-points {
+  order: 4;
+}
+
+.analysis-total-points {
+  order: 5;
+}
+
 .hand-table th,
 .hand-table td {
   border: 1px solid rgba(47, 84, 62, 0.16);

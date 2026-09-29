@@ -57,23 +57,50 @@ const parsePositiveInt = (value: string) =>
   /^[1-9]\d*$/.test(value.trim()) ? Number.parseInt(value, 10) : null;
 const formatAmount = (value: number) =>
   Number.isInteger(value) ? String(value) : value.toFixed(1);
-type PointSeries = { date: string; totals: number[] };
+type PointSeries = { date: string; label?: string; totals: number[] };
+type ChartPoint = {
+  date: string;
+  player: string;
+  total: number;
+  x: number;
+  y: number;
+};
 const PointTrendChart = ({
   series,
   players,
   highlightedPlayerIndex,
   label,
+  valueType = "point",
 }: {
   series: PointSeries[];
   players: string[];
   highlightedPlayerIndex: number | null;
   label: string;
+  valueType?: "point" | "rank";
 }) => {
   const values = series.flatMap((item) => item.totals);
-  const min = Math.min(0, ...values);
-  const max = Math.max(0, ...values);
+  const isRankChart = valueType === "rank";
+  const min = isRankChart ? 1 : Math.min(0, ...values);
+  const max = isRankChart ? 4 : Math.max(0, ...values);
   const range = max - min || 1;
+  const pointY = (value: number) =>
+    isRankChart
+      ? 18 + ((value - min) / range) * 218
+      : 18 + ((max - value) / range) * 218;
+  const valueLabel = (value: number) =>
+    isRankChart ? `${value.toFixed(2)}位` : `${value.toFixed(1)}pt`;
   const colors = ["#0f5132", "#b54708", "#2764a8", "#8a3fa0"];
+  const [hoveredPoint, setHoveredPoint] = useState<ChartPoint | null>(null);
+  const [selectedPoint, setSelectedPoint] = useState<ChartPoint | null>(null);
+  const tooltipPoint = hoveredPoint ?? selectedPoint;
+  const tooltipX = tooltipPoint
+    ? Math.min(Math.max(58, tooltipPoint.x - 70), 480)
+    : 0;
+  const tooltipY = tooltipPoint
+    ? tooltipPoint.y < 70
+      ? tooltipPoint.y + 10
+      : tooltipPoint.y - 52
+    : 0;
   return (
     <>
       <div className="chart-legend">
@@ -102,24 +129,36 @@ const PointTrendChart = ({
         >
           <line x1="52" y1="18" x2="52" y2="236" className="chart-axis" />
           <line x1="52" y1="236" x2="620" y2="236" className="chart-axis" />
-          <line
-            x1="52"
-            y1={18 + (max / range) * 218}
-            x2="620"
-            y2={18 + (max / range) * 218}
-            className="chart-zero"
-          />
-          <text x="4" y="24" className="chart-label">
-            {max.toFixed(1)}pt
-          </text>
-          <text x="4" y="236" className="chart-label">
-            {min.toFixed(1)}pt
-          </text>
+          {!isRankChart && (
+            <line
+              x1="52"
+              y1={18 + (max / range) * 218}
+              x2="620"
+              y2={18 + (max / range) * 218}
+              className="chart-zero"
+            />
+          )}
+          {isRankChart ? (
+            [1, 2, 3, 4].map((rank) => (
+              <text key={rank} x="4" y={pointY(rank) + 4} className="chart-label">
+                {rank}位
+              </text>
+            ))
+          ) : (
+            <>
+              <text x="4" y="24" className="chart-label">
+                {max.toFixed(1)}pt
+              </text>
+              <text x="4" y="236" className="chart-label">
+                {min.toFixed(1)}pt
+              </text>
+            </>
+          )}
           {players.map((player, playerIndex) => {
             const points = series
               .map(
                 (item, index) =>
-                  `${series.length === 1 ? 336 : 52 + (index / (series.length - 1)) * 568},${18 + ((max - item.totals[playerIndex]) / range) * 218}`,
+                  `${series.length === 1 ? 336 : 52 + (index / (series.length - 1)) * 568},${pointY(item.totals[playerIndex])}`,
               )
               .join(" ");
             return (
@@ -145,17 +184,38 @@ const PointTrendChart = ({
                     series.length === 1
                       ? 336
                       : 52 + (index / (series.length - 1)) * 568;
-                  const y =
-                    18 + ((max - item.totals[playerIndex]) / range) * 218;
+                  const y = pointY(item.totals[playerIndex]);
+                  const chartPoint = {
+                    date: item.label ?? item.date,
+                    player,
+                    total: item.totals[playerIndex],
+                    x,
+                    y,
+                  };
                   return (
                     <circle
                       key={item.date}
                       cx={x}
                       cy={y}
-                      r="4"
+                      r="6"
                       fill={colors[playerIndex]}
+                      className="chart-point"
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`${item.date}の${player}: ${valueLabel(item.totals[playerIndex])}`}
+                      onPointerEnter={() => setHoveredPoint(chartPoint)}
+                      onPointerLeave={() => setHoveredPoint(null)}
+                      onFocus={() => setHoveredPoint(chartPoint)}
+                      onBlur={() => setHoveredPoint(null)}
+                      onClick={() => setSelectedPoint(chartPoint)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          setSelectedPoint(chartPoint);
+                        }
+                      }}
                     >
-                      <title>{`${item.date}: ${player} ${item.totals[playerIndex].toFixed(1)}pt`}</title>
+                      <title>{`${item.date}: ${player} ${valueLabel(item.totals[playerIndex])}`}</title>
                     </circle>
                   );
                 })}
@@ -169,6 +229,17 @@ const PointTrendChart = ({
             <text x="620" y="264" textAnchor="end" className="chart-label">
               {series[series.length - 1].date}
             </text>
+          )}
+          {tooltipPoint && (
+            <g className="chart-tooltip" pointerEvents="none">
+              <rect x={tooltipX} y={tooltipY} width="140" height="40" rx="6" />
+              <text x={tooltipX + 8} y={tooltipY + 15}>
+                {tooltipPoint.date}
+              </text>
+              <text x={tooltipX + 8} y={tooltipY + 31}>
+                {tooltipPoint.player}: {valueLabel(tooltipPoint.total)}
+              </text>
+            </g>
           )}
         </svg>
       </div>
@@ -376,6 +447,17 @@ function App() {
   const dailyPointSeries = analysisSummaries
     .filter((summary) => summary.hands.length > 0)
     .map((summary) => ({ date: summary.session.date, totals: summary.totals }));
+  const handRankSeries = analysisSummaries
+    .flatMap((summary) =>
+      summary.hands.map((hand) => ({
+        date: summary.session.date,
+        totals: selectedRoom
+          ? computeHandPoints(selectedRoom, hand.scores, hand.tieBreakOrders)
+              .ranks
+          : [],
+      })),
+    )
+    .map((item, index) => ({ ...item, label: `${item.date}・第${index + 1}半荘` }));
   const totalPointSeries = dailyPointSeries.reduce<PointSeries[]>(
     (series, item) => [
       ...series,
@@ -1080,7 +1162,7 @@ function App() {
             <button onClick={goAnalysis}>分析を見る</button>
           </div>
           </div>
-          <div hidden={!isAnalysisView}>
+          <div hidden={!isAnalysisView} className="analysis-content">
           <section className="card">
             <div className="card-title">
               <h2>分析対象の対局日</h2>
@@ -1124,7 +1206,7 @@ function App() {
               <p className="alert-inline">開始日は終了日以前を選択してください。</p>
             )}
           </section>
-          <section className="card">
+          <section className="card analysis-stats">
             <div className="card-title">
               <h2>通算成績</h2>
               <div className="compact-meta">
@@ -1179,9 +1261,39 @@ function App() {
               </table>
             </div>
           </section>
-          <section className="card">
+          <section className="card analysis-total-points">
             <div className="card-title">
               <h2>合計ポイントの推移</h2>
+            </div>
+            {!totalPointSeries.length ? (
+              <p className="muted">半荘を記録すると推移を表示できます。</p>
+            ) : (
+              <PointTrendChart
+                series={totalPointSeries}
+                players={selectedRoom.players}
+                highlightedPlayerIndex={activeHighlightedPlayerIndex}
+                label="プレイヤー別の合計ポイント推移"
+              />
+            )}
+          </section>
+          <section className="card analysis-daily-points">
+            <div className="card-title">
+              <h2>日別総合ポイントの推移</h2>
+            </div>
+            {!dailyPointSeries.length ? (
+              <p className="muted">半荘を記録すると推移を表示できます。</p>
+            ) : (
+              <PointTrendChart
+                series={dailyPointSeries}
+                players={selectedRoom.players}
+                highlightedPlayerIndex={activeHighlightedPlayerIndex}
+                label="プレイヤー別の日別総合ポイント推移"
+              />
+            )}
+          </section>
+          <section className="card analysis-rank-trend">
+            <div className="card-title">
+              <h2>半荘ごとの順位推移</h2>
               <label className="field inline-field chart-player-select">
                 強調するプレイヤー
                 <select
@@ -1203,34 +1315,19 @@ function App() {
                 </select>
               </label>
             </div>
-            {!totalPointSeries.length ? (
+            {!handRankSeries.length ? (
               <p className="muted">半荘を記録すると推移を表示できます。</p>
             ) : (
               <PointTrendChart
-                series={totalPointSeries}
+                series={handRankSeries}
                 players={selectedRoom.players}
                 highlightedPlayerIndex={activeHighlightedPlayerIndex}
-                label="プレイヤー別の合計ポイント推移"
+                label="プレイヤー別の半荘ごとの順位推移"
+                valueType="rank"
               />
             )}
           </section>
-          <section className="card">
-            <div className="card-title">
-              <h2>日別総合ポイントの推移</h2>
-            </div>
-            <p className="small">対局日の半荘ポイント合計</p>
-            {!dailyPointSeries.length ? (
-              <p className="muted">半荘を記録すると推移を表示できます。</p>
-            ) : (
-              <PointTrendChart
-                series={dailyPointSeries}
-                players={selectedRoom.players}
-                highlightedPlayerIndex={activeHighlightedPlayerIndex}
-                label="プレイヤー別の日別総合ポイント推移"
-              />
-            )}
-          </section>
-          <section className="card">
+          <section className="card analysis-rank-distribution">
             <div className="card-title">
               <h2>順位分布</h2>
             </div>
