@@ -5,7 +5,7 @@ param(
 $resolvedPath = [System.IO.Path]::GetFullPath($KeystorePath)
 
 if (Test-Path $resolvedPath) {
-  throw "署名鍵が既にあります: $resolvedPath"
+  throw "A keystore already exists: $resolvedPath"
 }
 
 & keytool -genkeypair `
@@ -17,8 +17,8 @@ if (Test-Path $resolvedPath) {
   -validity 10000
 
 if ($LASTEXITCODE -ne 0) {
-  throw '署名鍵の作成に失敗しました。'
+  throw 'Failed to create the upload keystore.'
 }
 
-Write-Host "署名鍵を作成しました: $resolvedPath"
-Write-Host 'このファイルと入力したパスワードは安全な場所に保管してください。Gitへ追加してはいけません。'
+Write-Host "Upload keystore created: $resolvedPath"
+Write-Host 'Back up this file and its passwords securely. Do not add it to Git.'
